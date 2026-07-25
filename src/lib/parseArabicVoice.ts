@@ -128,6 +128,7 @@ function isNumberWord(t: string): boolean {
     THOUSAND_TWO.has(t) ||
     MILLION_WORDS.has(t) ||
     MILLION_TWO.has(t) ||
+    HALF_WORDS.has(t) ||
     /^\d+(\.\d+)?$/.test(t)
   );
 }
@@ -141,6 +142,7 @@ function parseAmountFromTokens(tokens: string[]): {
   // Find contiguous number-word run (allow "و" connectors inside).
   let runStart = -1;
   let runEnd = -1;
+
   for (let i = 0; i < tokens.length; i++) {
     if (isNumberWord(tokens[i]) || CURRENCY_WORDS.has(tokens[i])) {
       if (runStart === -1) runStart = i;
