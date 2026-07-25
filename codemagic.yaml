@@ -10,8 +10,7 @@ workflows:
       - name: Install dependencies
         script: |
           npm install --legacy-peer-deps
-      - name: Build Android APK
-        script: |
-          cd android && ./gradlew assembleRelease
     artifacts:
-      - android/app/build/outputs/apk/release/*.apk
+      - build/**/*.apk
+      - android/app/build/outputs/apk/**/*.apk
+      - dist/**/*
