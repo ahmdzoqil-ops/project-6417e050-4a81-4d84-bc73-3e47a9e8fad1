@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { Mic, Plus, Search, Pencil, Trash2, Wallet, HandCoins, History, Home } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { Mic, Plus, Search, Pencil, Trash2, Wallet, HandCoins, History, Home, Square, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,6 +33,8 @@ import {
   type Transaction,
   type TxType,
 } from "@/lib/storage";
+import { transcribeAudio } from "@/lib/transcribe.functions";
+import { parseArabicVoice } from "@/lib/parseArabicVoice";
 
 export const Route = createFileRoute("/")({
   component: App,
@@ -132,6 +135,10 @@ function App() {
               items={items}
               totalDebt={totals.debt}
               totalPocket={totals.pocket}
+              onAdd={(payload) => {
+                addTx(payload);
+                toast.success("تم حفظ العملية");
+              }}
             />
           </TabsContent>
 
@@ -172,10 +179,12 @@ function HomeTab({
   items,
   totalDebt,
   totalPocket,
+  onAdd,
 }: {
   items: Transaction[];
   totalDebt: number;
   totalPocket: number;
+  onAdd: (t: Omit<Transaction, "id" | "date">) => void;
 }) {
   const [query, setQuery] = useState("");
 
@@ -204,19 +213,8 @@ function HomeTab({
         <TotalCard label="إجمالي الجيب" amount={totalPocket} tone="pocket" />
       </div>
 
-      <Card className="border-dashed">
-        <CardContent className="flex flex-col items-center gap-2 py-6">
-          <button
-            type="button"
-            aria-label="اضغط وتكلم"
-            onClick={() => toast.info("ميزة الصوت ستُضاف لاحقًا")}
-            className="flex h-20 w-20 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95"
-          >
-            <Mic className="h-8 w-8" />
-          </button>
-          <p className="text-sm font-medium text-muted-foreground">اضغط وتكلم</p>
-        </CardContent>
-      </Card>
+      <VoicePanel onAdd={onAdd} />
+
 
       <div className="relative">
         <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -603,4 +601,283 @@ function LogTab({
       </AlertDialog>
     </div>
   );
+}
+
+type PendingVoice = {
+  type: TxType;
+  name: string;
+  amount: string;
+  rawText: string;
+};
+
+function VoicePanel({
+  onAdd,
+}: {
+  onAdd: (t: Omit<Transaction, "id" | "date">) => void;
+}) {
+  const transcribe = useServerFn(transcribeAudio);
+  const [state, setState] = useState<"idle" | "recording" | "processing">(
+    "idle",
+  );
+  const [pending, setPending] = useState<PendingVoice | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const cleanupStream = () => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    recorderRef.current = null;
+    chunksRef.current = [];
+  };
+
+  useEffect(() => cleanupStream, []);
+
+  const start = async () => {
+    if (state !== "idle") return;
+    if (
+      typeof navigator === "undefined" ||
+      !navigator.mediaDevices?.getUserMedia
+    ) {
+      toast.error("المتصفح لا يدعم تسجيل الصوت");
+      return;
+    }
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      toast.error("تم رفض إذن الميكروفون. فعّل الإذن وحاول مرة أخرى");
+      return;
+    }
+    streamRef.current = stream;
+
+    const mimeCandidates = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/mp4",
+      "audio/mpeg",
+    ];
+    const mime =
+      mimeCandidates.find(
+        (m) =>
+          typeof MediaRecorder !== "undefined" &&
+          MediaRecorder.isTypeSupported?.(m),
+      ) ?? "";
+    const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+    recorderRef.current = rec;
+    chunksRef.current = [];
+
+    rec.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
+    };
+    rec.onstop = async () => {
+      const blobType = rec.mimeType || mime || "audio/webm";
+      const blob = new Blob(chunksRef.current, { type: blobType });
+      cleanupStream();
+      if (blob.size < 1200) {
+        setState("idle");
+        toast.error("لم يتم سماع صوت. حاول مرة أخرى");
+        return;
+      }
+      setState("processing");
+      try {
+        const base64 = await blobToBase64(blob);
+        const { text } = await transcribe({
+          data: { audioBase64: base64, mime: blobType },
+        });
+        if (!text) {
+          toast.error("لم يتم الفهم. حاول مرة أخرى بوضوح");
+          setState("idle");
+          return;
+        }
+        const parsed = parseArabicVoice(text);
+        setPending({
+          type: parsed.type ?? "debt",
+          name: parsed.name,
+          amount: parsed.amount != null ? String(parsed.amount) : "",
+          rawText: text,
+        });
+        setState("idle");
+      } catch (err) {
+        console.error(err);
+        toast.error("تعذّر تحويل الصوت. حاول مرة أخرى");
+        setState("idle");
+      }
+    };
+    rec.start();
+    setState("recording");
+  };
+
+  const stop = () => {
+    if (state !== "recording") return;
+    try {
+      recorderRef.current?.stop();
+    } catch {
+      cleanupStream();
+      setState("idle");
+    }
+  };
+
+  const isRecording = state === "recording";
+  const isProcessing = state === "processing";
+
+  return (
+    <>
+      <Card className="border-dashed">
+        <CardContent className="flex flex-col items-center gap-2 py-6">
+          <button
+            type="button"
+            aria-label={isRecording ? "إيقاف التسجيل" : "اضغط وتكلم"}
+            onClick={isRecording ? stop : start}
+            disabled={isProcessing}
+            className={
+              "relative flex h-20 w-20 items-center justify-center rounded-full shadow-lg transition-transform active:scale-95 " +
+              (isRecording
+                ? "bg-rose-600 text-white animate-pulse"
+                : "bg-primary text-primary-foreground") +
+              (isProcessing ? " opacity-60" : "")
+            }
+          >
+            {isProcessing ? (
+              <Loader2 className="h-8 w-8 animate-spin" />
+            ) : isRecording ? (
+              <Square className="h-7 w-7 fill-current" />
+            ) : (
+              <Mic className="h-8 w-8" />
+            )}
+          </button>
+          <p className="text-sm font-medium text-muted-foreground">
+            {isRecording
+              ? "جاري الاستماع… اضغط للإيقاف"
+              : isProcessing
+                ? "جاري تحويل الصوت…"
+                : "اضغط وتكلم"}
+          </p>
+          <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
+            مثال: «دين أحمد خمسمائة» أو «جيب سعيد ألف وخمسمائة»
+          </p>
+        </CardContent>
+      </Card>
+
+      <VoiceConfirmDialog
+        pending={pending}
+        onCancel={() => setPending(null)}
+        onSave={(p) => {
+          const n = Number(p.amount);
+          if (!p.name.trim()) {
+            toast.error("الرجاء إدخال اسم العميل");
+            return;
+          }
+          if (!Number.isFinite(n) || n <= 0) {
+            toast.error("الرجاء إدخال مبلغ صحيح أكبر من صفر");
+            return;
+          }
+          onAdd({ type: p.type, name: p.name.trim(), amount: n });
+          setPending(null);
+        }}
+      />
+    </>
+  );
+}
+
+function VoiceConfirmDialog({
+  pending,
+  onCancel,
+  onSave,
+}: {
+  pending: PendingVoice | null;
+  onCancel: () => void;
+  onSave: (p: PendingVoice) => void;
+}) {
+  const [draft, setDraft] = useState<PendingVoice | null>(pending);
+  useEffect(() => setDraft(pending), [pending]);
+
+  return (
+    <Dialog
+      open={!!pending}
+      onOpenChange={(o) => {
+        if (!o) onCancel();
+      }}
+    >
+      <DialogContent dir="rtl">
+        <DialogHeader>
+          <DialogTitle>تأكيد العملية الصوتية</DialogTitle>
+        </DialogHeader>
+        {draft && (
+          <div className="space-y-3">
+            <div className="rounded-md bg-muted/60 p-2 text-xs text-muted-foreground">
+              «{draft.rawText}»
+            </div>
+            <div>
+              <Label className="mb-2 block">النوع</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant={draft.type === "debt" ? "default" : "outline"}
+                  onClick={() => setDraft({ ...draft, type: "debt" })}
+                  className={
+                    draft.type === "debt" ? "bg-rose-600 hover:bg-rose-700" : ""
+                  }
+                >
+                  <HandCoins className="ml-1 h-4 w-4" /> دين
+                </Button>
+                <Button
+                  type="button"
+                  variant={draft.type === "pocket" ? "default" : "outline"}
+                  onClick={() => setDraft({ ...draft, type: "pocket" })}
+                  className={
+                    draft.type === "pocket"
+                      ? "bg-emerald-600 hover:bg-emerald-700"
+                      : ""
+                  }
+                >
+                  <Wallet className="ml-1 h-4 w-4" /> جيب
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="v-name">اسم العميل</Label>
+              <Input
+                id="v-name"
+                value={draft.name}
+                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                placeholder="اسم العميل"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="v-amount">المبلغ</Label>
+              <Input
+                id="v-amount"
+                type="number"
+                min="0"
+                step="0.01"
+                value={draft.amount}
+                onChange={(e) => setDraft({ ...draft, amount: e.target.value })}
+                placeholder="0"
+              />
+            </div>
+          </div>
+        )}
+        <DialogFooter className="gap-2 sm:gap-2">
+          <Button variant="outline" onClick={onCancel}>
+            إلغاء
+          </Button>
+          <Button onClick={() => draft && onSave(draft)}>حفظ</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+async function blobToBase64(blob: Blob): Promise<string> {
+  const buf = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(
+      ...bytes.subarray(i, Math.min(i + chunk, bytes.length)),
+    );
+  }
+  return btoa(binary);
 }
