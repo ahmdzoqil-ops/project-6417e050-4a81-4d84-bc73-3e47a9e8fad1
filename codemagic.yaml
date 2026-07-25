@@ -1,0 +1,16 @@
+workflows:
+  react-native-workflow:
+    name: React Native Workflow
+    max_build_duration: 120
+    instance_type: mac_mini_m1
+    environment:
+      node: latest
+      xcode: latest
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm install
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild/outputs/*.apk
+      - android/app/build/outputs/apk/**/*.apk
