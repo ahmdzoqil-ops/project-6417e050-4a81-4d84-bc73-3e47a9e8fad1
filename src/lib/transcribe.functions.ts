@@ -29,6 +29,11 @@ export const transcribeAudio = createServerFn({ method: "POST" })
     form.append("file", blob, `recording.${ext}`);
     form.append("model", "openai/gpt-4o-mini-transcribe");
     form.append("language", "ar");
+    form.append(
+      "prompt",
+      "تسجيل باللهجة العربية العامية لعمليات دين وجيب. أمثلة: علي عليه ألف وخمسمية، محمد صالح له ألفين ونص، سمير القحطاني 2500، زد محمد خمسمية، عبد الرحمن دين ثلاثة آلاف وثمانمية، فاطمة جيب ألف وسبعمية. الأسماء عربية كاملة مثل محمد، أحمد، علي، عبد الله، عبد الرحمن، فاطمة الزهراء، سمير القحطاني. الأرقام بالعامية: خمسمية، ستمية، سبعمية، تمانمية، تسعمية، متين، ألفين، نص. اكتب الأرقام بالكلمات العربية.",
+    );
+
 
     const res = await fetch(
       "https://ai.gateway.lovable.dev/v1/audio/transcriptions",
