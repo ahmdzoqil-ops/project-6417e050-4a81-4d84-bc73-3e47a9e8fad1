@@ -10,13 +10,5 @@ workflows:
       - name: Install dependencies
         script: |
           npm install --legacy-peer-deps
-      - name: Build Web or App Output
-        script: |
-          if npm run | grep -q "build"; then
-            npm run build
-          fi
     artifacts:
-      - build/**/*
-      - dist/**/*
-      - android/app/build/outputs/apk/**/*.apk
-      - *.apk
+      - android/app/build/outputs/apk/release/app-release.apk
