@@ -240,7 +240,15 @@ function parseAmountFromTokens(tokens: string[]): {
       consumed.add(i);
       continue;
     }
+    if (HALF_WORDS.has(t)) {
+      // "ألفين ونص" = 2500 — half of thousand scale.
+      total += 500;
+      matchedAny = true;
+      consumed.add(i);
+      continue;
+    }
   }
+
 
   total += current;
   if (!matchedAny) return { amount: null, consumed: new Set() };
