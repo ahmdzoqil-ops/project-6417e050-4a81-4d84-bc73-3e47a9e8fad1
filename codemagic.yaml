@@ -22,19 +22,26 @@ workflows:
         script: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
 
-      - name: Create Capacitor config
+      - name: Initialize Capacitor
         script: |
-          npx cap init "Voice Debt Pocket" "com.voice.debt.pocket" --web-dir dist
+          npx cap init "Voice Debt Pocket" "com.voice.debt.pocket" --web-dir=dist
 
-      - name: Create Android project
+      - name: Add Android platform
         script: |
           npx cap add android
 
-      - name: Sync files
+      - name: Sync Android
         script: |
           npx cap sync android
 
       - name: Build APK
+        script: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease
+
+    artifacts:
+      - android/app/build/outputs/apk/release/*.apk      - name: Build APK
         script: |
           cd android
           chmod +x gradlew
