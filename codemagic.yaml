@@ -1,63 +1,21 @@
 workflows:
   react-native-android:
-    name: Lovable Android APK Build
+    name: React Native Android Build
     max_build_duration: 120
-
     instance_type: mac_mini_m1
 
     environment:
       node: latest
-      java: 17
 
     scripts:
-      - name: Install packages
+      - name: Install dependencies
         script: |
-          npm install
+          npm install --legacy-peer-deps
 
-      - name: Build web project
-        script: |
-          npm run build
-
-      - name: Install Capacitor
-        script: |
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-
-      - name: Initialize Capacitor
-        script: |
-          npx cap init "Voice Debt Pocket" "com.voice.debt.pocket" --web-dir=dist
-
-      - name: Add Android platform
-        script: |
-          npx cap add android
-
-      - name: Sync Android
-        script: |
-          npx cap sync android
-
-      - name: Build APK
+      - name: Build Android APK
         script: |
           cd android
-          chmod +x gradlew
           ./gradlew assembleRelease
 
     artifacts:
-      - android/app/build/outputs/apk/release/*.apk      - name: Build APK
-        script: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleRelease
-
-    artifacts:
-      - android/app/build/outputs/apk/release/*.apk
-      - name: Build Release APK
-        script: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleRelease
-
-    artifacts:
-      - android/app/build/outputs/apk/release/*.apk
-      ./gradlew assembleRelease
-
-    artifacts:
-      - android/app/build/outputs/apk/release/*.apk
+      - android/app/build/outputs/apk/release/app-release.apk
