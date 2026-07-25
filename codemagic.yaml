@@ -1,37 +1,15 @@
- workflows:
-  web-to-android:
-    name: Build Android APK from Lovable App
+workflows:
+  react-native-android:
+    name: React Native Android Build
     max_build_duration: 120
     instance_type: mac_mini_m1
-
     environment:
       node: latest
-
+      xcode: latest
     scripts:
       - name: Install dependencies
         script: |
           npm install --legacy-peer-deps
-
-      - name: Build web app
-        script: |
-          npm run build
-
-      - name: Install Capacitor
-        script: |
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-
-      - name: Add Android platform
-        script: |
-          npx cap add android
-
-      - name: Sync Android
-        script: |
-          npx cap sync android
-
-      - name: Build APK
-        script: |
-          cd android
-          ./gradlew assembleRelease
-
     artifacts:
+      - android/app/build/outputs/apk/release/app-release.apk
       - android/app/build/outputs/apk/release/app-release.apk
