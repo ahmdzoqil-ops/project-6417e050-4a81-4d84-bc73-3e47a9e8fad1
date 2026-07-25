@@ -83,13 +83,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "تطبيق عربي بسيط لإدارة الديون والجيب محليًا على جهازك بدون حسابات أو إنترنت.",
       },
-      { property: "og:title", content: "دينك بصوتك" },
+      { property: "og:title", content: "دينك بصوتك — إدارة الديون والجيب" },
       {
         property: "og:description",
-        content: "سجل الديون والجيب بسرعة، محليًا وبدون حساب.",
+        content: "تطبيق عربي بسيط لإدارة الديون والجيب محليًا على جهازك بدون حسابات أو إنترنت.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "دينك بصوتك — إدارة الديون والجيب" },
+      { name: "twitter:description", content: "تطبيق عربي بسيط لإدارة الديون والجيب محليًا على جهازك بدون حسابات أو إنترنت." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/5xjnRPI3PvebRuOu8FGXUrApS4F2/social-images/social-1784962075942-1759695451458.webp" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/5xjnRPI3PvebRuOu8FGXUrApS4F2/social-images/social-1784962075942-1759695451458.webp" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
