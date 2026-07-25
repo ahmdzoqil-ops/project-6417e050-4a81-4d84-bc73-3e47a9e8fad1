@@ -42,75 +42,86 @@ function normalizeText(s: string): string {
 
 const UNITS: Record<string, number> = {
   "صفر": 0,
-  "واحد": 1,
-  "واحده": 1,
-  "اثنين": 2,
-  "اثنان": 2,
-  "اتنين": 2,
-  "ثلاثه": 3,
-  "ثلاث": 3,
-  "تلاته": 3,
-  "اربعه": 4,
-  "اربع": 4,
-  "خمسه": 5,
-  "خمس": 5,
-  "سته": 6,
-  "ست": 6,
-  "سبعه": 7,
-  "سبع": 7,
-  "ثمانيه": 8,
-  "ثماني": 8,
-  "ثمان": 8,
-  "تمانيه": 8,
-  "تسعه": 9,
-  "تسع": 9,
-  "عشره": 10,
-  "عشر": 10,
+  "واحد": 1, "واحده": 1, "احد": 1,
+  "اثنين": 2, "اثنان": 2, "اتنين": 2, "اتنان": 2,
+  "ثلاثه": 3, "ثلاث": 3, "تلاته": 3, "تلات": 3,
+  "اربعه": 4, "اربع": 4,
+  "خمسه": 5, "خمس": 5,
+  "سته": 6, "ست": 6,
+  "سبعه": 7, "سبع": 7,
+  "ثمانيه": 8, "ثماني": 8, "ثمان": 8, "تمانيه": 8, "تمان": 8,
+  "تسعه": 9, "تسع": 9,
+  "عشره": 10, "عشر": 10,
+};
+
+const TEENS: Record<string, number> = {
+  "احدعشر": 11, "احداعشر": 11, "احدعشره": 11,
+  "اثناعشر": 12, "اثنيعشر": 12, "اتناشر": 12, "اطناشر": 12,
+  "ثلاثهعشر": 13, "ثلاثتعشر": 13,
+  "اربعتاشر": 14, "اربعهعشر": 14,
+  "خمستاشر": 15, "خمسهعشر": 15,
+  "ستاشر": 16, "ستهعشر": 16,
+  "سبعتاشر": 17, "سبعهعشر": 17,
+  "ثمنتاشر": 18, "تمنتاشر": 18, "ثمانيهعشر": 18,
+  "تسعتاشر": 19, "تسعهعشر": 19,
+};
+
+const TENS: Record<string, number> = {
+  "عشرين": 20, "عشرون": 20,
+  "ثلاثين": 30, "ثلاثون": 30, "تلاتين": 30,
+  "اربعين": 40, "اربعون": 40,
+  "خمسين": 50, "خمسون": 50,
+  "ستين": 60, "ستون": 60,
+  "سبعين": 70, "سبعون": 70,
+  "ثمانين": 80, "ثمانون": 80, "تمانين": 80,
+  "تسعين": 90, "تسعون": 90,
 };
 
 const HUNDREDS: Record<string, number> = {
-  "مايه": 100,
-  "مئه": 100,
-  "ميه": 100,
-  "مايتين": 200,
-  "مئتين": 200,
-  "ميتين": 200,
-  "ثلاثمايه": 300,
-  "ثلاثمئه": 300,
-  "تلتمايه": 300,
-  "اربعمايه": 400,
-  "اربعمئه": 400,
-  "خمسمايه": 500,
-  "خمسمئه": 500,
-  "ستمايه": 600,
-  "ستمئه": 600,
-  "سبعمايه": 700,
-  "سبعمئه": 700,
-  "ثمنمايه": 800,
-  "ثمانمايه": 800,
-  "ثمانمئه": 800,
-  "تسعمايه": 900,
-  "تسعمئه": 900,
+  "مايه": 100, "مئه": 100, "ميه": 100, "مايا": 100,
+  "مايتين": 200, "مئتين": 200, "ميتين": 200,
+  "ثلاثمايه": 300, "ثلاثمئه": 300, "تلتمايه": 300, "تلاتمايه": 300,
+  "اربعمايه": 400, "اربعمئه": 400,
+  "خمسمايه": 500, "خمسمئه": 500,
+  "ستمايه": 600, "ستمئه": 600,
+  "سبعمايه": 700, "سبعمئه": 700,
+  "ثمنمايه": 800, "ثمانمايه": 800, "ثمانمئه": 800, "تمنمايه": 800,
+  "تسعمايه": 900, "تسعمئه": 900,
 };
 
-const THOUSAND_WORDS = new Set(["الف", "الاف", "آلاف"]);
+const THOUSAND_WORDS = new Set(["الف", "الاف", "آلاف", "تلاف"]);
+const THOUSAND_TWO = new Set(["الفين", "الفان"]);
 const MILLION_WORDS = new Set(["مليون", "ملايين"]);
+const MILLION_TWO = new Set(["مليونين", "مليونان"]);
 
-// Tokens to strip from name after parsing
 const CURRENCY_WORDS = new Set([
-  "جنيه",
-  "جنية",
-  "ريال",
-  "دينار",
-  "درهم",
-  "ليره",
-  "ليرة",
-  "دولار",
+  "جنيه", "جنية", "جنيها",
+  "ريال", "ريالا",
+  "دينار", "دينارا",
+  "درهم", "درهما",
+  "ليره", "ليرة",
+  "دولار", "دولارا",
   "يورو",
-  "قرش",
+  "قرش", "قروش",
   "هلله",
 ]);
-const FILLER = new Set(["و", "علي", "على", "ل", "من", "الي", "إلى", "الى", "يا"]);
+
+// Filler to strip from name. Keep "و" and common names like "علي/على".
+const FILLER = new Set(["ل", "من", "الي", "إلى", "الى", "يا", "ب", "بمبلغ", "مبلغ", "قيمه", "قيمته"]);
+
+function isNumberWord(t: string): boolean {
+  return (
+    UNITS[t] !== undefined ||
+    TEENS[t] !== undefined ||
+    TENS[t] !== undefined ||
+    HUNDREDS[t] !== undefined ||
+    THOUSAND_WORDS.has(t) ||
+    THOUSAND_TWO.has(t) ||
+    MILLION_WORDS.has(t) ||
+    MILLION_TWO.has(t) ||
+    /^\d+(\.\d+)?$/.test(t)
+  );
+}
 
 function parseAmountFromTokens(tokens: string[]): {
   amount: number | null;
@@ -118,104 +129,110 @@ function parseAmountFromTokens(tokens: string[]): {
 } {
   const consumed = new Set<number>();
 
-  // 1) numeric token wins
+  // Find contiguous number-word run (allow "و" connectors inside).
+  let runStart = -1;
+  let runEnd = -1;
   for (let i = 0; i < tokens.length; i++) {
-    const t = tokens[i];
-    if (/^\d+(\.\d+)?$/.test(t)) {
-      consumed.add(i);
-      // consume adjacent "الف/مليون"
-      let mul = 1;
-      if (i + 1 < tokens.length) {
-        const nxt = tokens[i + 1];
-        if (THOUSAND_WORDS.has(nxt)) {
-          mul = 1000;
-          consumed.add(i + 1);
-        } else if (MILLION_WORDS.has(nxt)) {
-          mul = 1_000_000;
-          consumed.add(i + 1);
-        }
+    if (isNumberWord(tokens[i]) || CURRENCY_WORDS.has(tokens[i])) {
+      if (runStart === -1) runStart = i;
+      runEnd = i;
+    } else if (tokens[i] === "و" && runStart !== -1) {
+      // Only extend if next token is also a number word.
+      const nxt = tokens[i + 1];
+      if (nxt && (isNumberWord(nxt) || CURRENCY_WORDS.has(nxt))) {
+        runEnd = i;
+        continue;
       }
-      // strip trailing currency
-      if (i + 1 < tokens.length && CURRENCY_WORDS.has(tokens[i + 1])) {
-        consumed.add(i + 1);
-      }
-      return { amount: Number(t) * mul, consumed };
+      // otherwise break
+      if (runStart !== -1) break;
+    } else if (runStart !== -1) {
+      break;
     }
   }
 
-  // 2) words-based
-  let total = 0;
-  let current = 0;
-  let matchedAny = false;
-  const localConsumed = new Set<number>();
+  if (runStart === -1) return { amount: null, consumed };
 
-  for (let i = 0; i < tokens.length; i++) {
+  let total = 0;
+  let current = 0; // accumulator for current "scale group" (< 1000)
+  let matchedAny = false;
+
+  const flushScale = (scale: number, defaultOne: boolean) => {
+    if (current === 0) {
+      if (defaultOne) total += 1 * scale;
+    } else {
+      total += current * scale;
+      current = 0;
+    }
+  };
+
+  for (let i = runStart; i <= runEnd; i++) {
     const t = tokens[i];
     if (t === "و") {
-      // connector, keep going
-      if (matchedAny) localConsumed.add(i);
+      consumed.add(i);
+      continue;
+    }
+    if (CURRENCY_WORDS.has(t)) {
+      consumed.add(i);
+      continue;
+    }
+    if (/^\d+(\.\d+)?$/.test(t)) {
+      current += Number(t);
+      matchedAny = true;
+      consumed.add(i);
       continue;
     }
     if (HUNDREDS[t] !== undefined) {
       current += HUNDREDS[t];
       matchedAny = true;
-      localConsumed.add(i);
+      consumed.add(i);
+      continue;
+    }
+    if (TENS[t] !== undefined) {
+      current += TENS[t];
+      matchedAny = true;
+      consumed.add(i);
+      continue;
+    }
+    if (TEENS[t] !== undefined) {
+      current += TEENS[t];
+      matchedAny = true;
+      consumed.add(i);
       continue;
     }
     if (UNITS[t] !== undefined) {
-      // "خمسة آلاف" -> unit * 1000
-      const next = tokens[i + 1];
-      if (next && THOUSAND_WORDS.has(next)) {
-        total += (UNITS[t] || 1) * 1000;
-        localConsumed.add(i);
-        localConsumed.add(i + 1);
-        matchedAny = true;
-        i++;
-        continue;
-      }
-      if (next && MILLION_WORDS.has(next)) {
-        total += (UNITS[t] || 1) * 1_000_000;
-        localConsumed.add(i);
-        localConsumed.add(i + 1);
-        matchedAny = true;
-        i++;
-        continue;
-      }
       current += UNITS[t];
       matchedAny = true;
-      localConsumed.add(i);
+      consumed.add(i);
+      continue;
+    }
+    if (THOUSAND_TWO.has(t)) {
+      total += 2000;
+      matchedAny = true;
+      consumed.add(i);
       continue;
     }
     if (THOUSAND_WORDS.has(t)) {
-      // "الف" alone -> 1000
-      total += (current || 1) * 1000;
-      current = 0;
+      flushScale(1000, true);
       matchedAny = true;
-      localConsumed.add(i);
+      consumed.add(i);
       continue;
     }
-    if (t === "الفين") {
-      total += 2000;
+    if (MILLION_TWO.has(t)) {
+      total += 2_000_000;
       matchedAny = true;
-      localConsumed.add(i);
+      consumed.add(i);
       continue;
     }
     if (MILLION_WORDS.has(t)) {
-      total += (current || 1) * 1_000_000;
-      current = 0;
+      flushScale(1_000_000, true);
       matchedAny = true;
-      localConsumed.add(i);
-      continue;
-    }
-    if (CURRENCY_WORDS.has(t)) {
-      localConsumed.add(i);
+      consumed.add(i);
       continue;
     }
   }
+
   total += current;
-  if (!matchedAny) return { amount: null, consumed };
-  // also consume connectors "و" that fell between
-  for (const idx of localConsumed) consumed.add(idx);
+  if (!matchedAny) return { amount: null, consumed: new Set() };
   return { amount: total, consumed };
 }
 
@@ -228,12 +245,12 @@ export function parseArabicVoice(raw: string): ParsedVoice {
   const typeConsumed = new Set<number>();
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i];
-    if (t === "دين" || t === "ديون" || t === "استلف" || t === "سلفه") {
+    if (t === "دين" || t === "ديون" || t === "استلف" || t === "سلفه" || t === "سلف" || t === "دينت") {
       type = "debt";
       typeConsumed.add(i);
       break;
     }
-    if (t === "جيب" || t === "مصروف" || t === "قبض" || t === "قبضت") {
+    if (t === "جيب" || t === "مصروف" || t === "قبض" || t === "قبضت" || t === "استلمت" || t === "استلم") {
       type = "pocket";
       typeConsumed.add(i);
       break;
@@ -250,6 +267,10 @@ export function parseArabicVoice(raw: string): ParsedVoice {
     if (CURRENCY_WORDS.has(t)) continue;
     nameTokens.push(t);
   }
+  // Trim leading/trailing "و"
+  while (nameTokens.length && nameTokens[0] === "و") nameTokens.shift();
+  while (nameTokens.length && nameTokens[nameTokens.length - 1] === "و") nameTokens.pop();
+
   const name = nameTokens.join(" ").trim();
 
   return { type, amount, name };
