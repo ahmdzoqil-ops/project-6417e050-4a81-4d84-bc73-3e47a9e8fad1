@@ -135,6 +135,10 @@ function App() {
               items={items}
               totalDebt={totals.debt}
               totalPocket={totals.pocket}
+              onAdd={(payload) => {
+                addTx(payload);
+                toast.success("تم حفظ العملية");
+              }}
             />
           </TabsContent>
 
