@@ -179,10 +179,12 @@ function HomeTab({
   items,
   totalDebt,
   totalPocket,
+  onAdd,
 }: {
   items: Transaction[];
   totalDebt: number;
   totalPocket: number;
+  onAdd: (t: Omit<Transaction, "id" | "date">) => void;
 }) {
   const [query, setQuery] = useState("");
 
@@ -211,19 +213,8 @@ function HomeTab({
         <TotalCard label="إجمالي الجيب" amount={totalPocket} tone="pocket" />
       </div>
 
-      <Card className="border-dashed">
-        <CardContent className="flex flex-col items-center gap-2 py-6">
-          <button
-            type="button"
-            aria-label="اضغط وتكلم"
-            onClick={() => toast.info("ميزة الصوت ستُضاف لاحقًا")}
-            className="flex h-20 w-20 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95"
-          >
-            <Mic className="h-8 w-8" />
-          </button>
-          <p className="text-sm font-medium text-muted-foreground">اضغط وتكلم</p>
-        </CardContent>
-      </Card>
+      <VoicePanel onAdd={onAdd} />
+
 
       <div className="relative">
         <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
