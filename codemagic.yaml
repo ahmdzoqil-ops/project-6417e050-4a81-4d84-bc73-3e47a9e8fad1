@@ -6,7 +6,6 @@ workflows:
     environment:
       node: latest
       xcode: latest
-      flutter: false
     scripts:
       - name: Install dependencies
         script: |
