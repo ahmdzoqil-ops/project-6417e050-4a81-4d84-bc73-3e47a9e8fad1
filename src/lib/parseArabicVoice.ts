@@ -239,7 +239,17 @@ function parseAmountFromTokens(tokens: string[]): {
 export function parseArabicVoice(raw: string): ParsedVoice {
   const text = normalizeText(raw);
   if (!text) return { type: null, amount: null, name: "" };
-  const tokens = text.split(" ");
+  const rawTokens = text.split(" ");
+  // Split leading "و" from tokens like "ومئتين" -> ["و","مئتين"]
+  const tokens: string[] = [];
+  for (const t of rawTokens) {
+    if (t.length > 1 && t.startsWith("و") && isNumberWord(t.slice(1))) {
+      tokens.push("و", t.slice(1));
+    } else {
+      tokens.push(t);
+    }
+  }
+
 
   let type: TxType | null = null;
   const typeConsumed = new Set<number>();
