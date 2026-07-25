@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { Mic, Plus, Search, Pencil, Trash2, Wallet, HandCoins, History, Home } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { Mic, Plus, Search, Pencil, Trash2, Wallet, HandCoins, History, Home, Square, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,6 +33,8 @@ import {
   type Transaction,
   type TxType,
 } from "@/lib/storage";
+import { transcribeAudio } from "@/lib/transcribe.functions";
+import { parseArabicVoice } from "@/lib/parseArabicVoice";
 
 export const Route = createFileRoute("/")({
   component: App,
