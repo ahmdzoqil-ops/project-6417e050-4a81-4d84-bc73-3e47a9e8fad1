@@ -3,15 +3,9 @@ import type { CapacitorConfig } from "@capacitor/cli";
 const config: CapacitorConfig = {
   appId: "app.lovable.deinakbisawtak",
   appName: "دينك بصوتك",
-  // مجلد الويب المبني. يُملأ عبر السكربت: bun run android:sync
+  // مجلد الويب المبني محليًا داخل التطبيق. يُملأ عبر: npm run android:sync
   webDir: "dist",
-  server: {
-    // التطبيق يعمل داخل WebView على النسخة المنشورة حتى يعمل الإدخال الصوتي (التفريغ الصوتي يحتاج الخادم).
-    // لتشغيل نسخة مضمّنة بالكامل داخل الجهاز، احذف كتلة server هذه ثم نفّذ: bun run android:sync
-    url: "https://voice-debt-pocket.lovable.app",
-    cleartext: false,
-    androidScheme: "https",
-  },
+  // لا يوجد server.url: التطبيق مستقل ويعمل من الملفات المحلية داخل الجهاز.
   android: {
     allowMixedContent: false,
   },
