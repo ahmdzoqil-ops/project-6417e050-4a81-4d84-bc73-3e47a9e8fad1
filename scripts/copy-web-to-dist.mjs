@@ -21,7 +21,9 @@ if (!source) {
   process.exit(1);
 }
 
-await rm("dist", { recursive: true, force: true });
+if (!source.startsWith("dist")) {
+  await rm("dist", { recursive: true, force: true });
+}
 await mkdir("dist", { recursive: true });
 await cp(source, "dist", { recursive: true });
 console.log(`تم نسخ ${source} إلى dist`);
