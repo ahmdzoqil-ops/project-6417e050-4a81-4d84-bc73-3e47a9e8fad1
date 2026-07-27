@@ -3,7 +3,7 @@ import { writeFile } from "node:fs/promises";
 
 const mod = await import(new URL("../dist/server/index.mjs", import.meta.url).href);
 const handler = mod.default ?? mod;
-const res = await handler.fetch(new Request("http://localhost/"), {}, {});
+const res = await handler.fetch(new Request("http://localhost/"), {}, { waitUntil: () => {}, passThroughOnException: () => {}, props: {} });
 const html = await res.text();
 if (!res.ok || !html.includes("<html")) {
   console.error("فشل توليد الصفحة الثابتة:", res.status);
