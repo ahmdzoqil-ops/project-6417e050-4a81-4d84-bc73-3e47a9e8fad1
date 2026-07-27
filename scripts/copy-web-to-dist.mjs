@@ -1,5 +1,5 @@
 // ينسخ مخرجات بناء الويب إلى مجلد dist الذي يستخدمه Capacitor (ملفات محلية بالكامل).
-import { cp, rm, mkdir, stat, rename } from "node:fs/promises";
+import { cp, rm, mkdir, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -37,4 +37,3 @@ await stat("dist/index.html").catch(() => {
 });
 
 console.log(`تم نسخ ${source} إلى dist (ملفات محلية للتطبيق)`);
-void rename;
