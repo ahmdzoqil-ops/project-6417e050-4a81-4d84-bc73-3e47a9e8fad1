@@ -32,8 +32,12 @@ await mkdir("dist", { recursive: true });
 await cp(staging, "dist", { recursive: true });
 await rm(staging, { recursive: true, force: true });
 
-await stat("dist/index.html").catch(() => {
-  console.error("تحذير: لم يتم العثور على dist/index.html");
-});
+// ننقل الصفحة الثابتة المولّدة (scripts/prerender-index.mjs) لتكون نقطة الدخول المحلية
+try {
+  await cp(".cap-index.html", "dist/index.html");
+  await rm(".cap-index.html", { force: true });
+} catch {
+  console.error("تحذير: لم يتم العثور على .cap-index.html — نفّذ scripts/prerender-index.mjs قبل النسخ.");
+}
 
 console.log(`تم نسخ ${source} إلى dist (ملفات محلية للتطبيق)`);
