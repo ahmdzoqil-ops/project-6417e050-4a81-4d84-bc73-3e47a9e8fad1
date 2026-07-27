@@ -34,7 +34,7 @@ import {
   type TxType,
 } from "@/lib/storage";
 import { transcribeAudio } from "@/lib/transcribe.functions";
-import { isNativeApp, transcribeViaRemote } from "@/lib/transcribe.client";
+import { isNativeApp, transcribeViaRemote } from "@/lib/transcribeRemote";
 import { parseArabicVoice } from "@/lib/parseArabicVoice";
 
 export const Route = createFileRoute("/")({
