@@ -1,15 +1,26 @@
 workflows:
-  react-native-android:
-    name: React Native Android Build
-    max_build_duration: 120
-    instance_type: mac_mini_m1
+  android-capacitor:
+    name: بناء تطبيق أندرويد (Capacitor)
+    max_build_duration: 60
+    instance_type: linux_x2
     environment:
-      node: latest
-      xcode: latest
+      node: 20
+      java: 21
+      groups:
+        - keystore_credentials # اختياري: KEYSTORE_PATH / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD
     scripts:
-      - name: Install dependencies
+      - name: تثبيت الحزم
+        script: npm install --legacy-peer-deps
+      - name: بناء الويب ومزامنة Capacitor
         script: |
-          npm install --legacy-peer-deps
+          npx vite build
+          node scripts/copy-web-to-dist.mjs
+          npx cap sync android
+      - name: بناء APK و AAB
+        script: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease bundleRelease
     artifacts:
-      - android/app/build/outputs/apk/release/app-release.apk
-      - android/app/build/outputs/apk/release/app-release.apk
+      - android/app/build/outputs/apk/release/*.apk
+      - android/app/build/outputs/bundle/release/*.aab
