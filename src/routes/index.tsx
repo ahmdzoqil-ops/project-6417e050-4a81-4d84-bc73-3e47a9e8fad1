@@ -34,6 +34,7 @@ import {
   type TxType,
 } from "@/lib/storage";
 import { transcribeAudio } from "@/lib/transcribe.functions";
+import { isNativeApp, transcribeViaRemote } from "@/lib/transcribeRemote";
 import { parseArabicVoice } from "@/lib/parseArabicVoice";
 
 export const Route = createFileRoute("/")({
@@ -682,9 +683,12 @@ function VoicePanel({
       setState("processing");
       try {
         const base64 = await blobToBase64(blob);
-        const { text } = await transcribe({
-          data: { audioBase64: base64, mime: blobType },
-        });
+        // في تطبيق أندرويد المستقل لا يوجد خادم محلي، لذا نستخدم نقطة النهاية العامة
+        const { text } = isNativeApp()
+          ? await transcribeViaRemote(base64, blobType)
+          : await transcribe({
+              data: { audioBase64: base64, mime: blobType },
+            });
         if (!text) {
           toast.error("لم يتم الفهم. حاول مرة أخرى بوضوح");
           setState("idle");

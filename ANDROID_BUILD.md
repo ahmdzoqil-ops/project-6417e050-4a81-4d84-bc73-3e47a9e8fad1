@@ -51,8 +51,10 @@ npm run android:open
 
 ## ملاحظات
 
-- إذن الميكروفون (`RECORD_AUDIO`) مضاف في `AndroidManifest.xml` ويُطلب تلقائيًا عند فتح التطبيق، لذلك يعمل الإدخال الصوتي داخل التطبيق وليس في المتصفح فقط.
-- الإدخال الصوتي يحتاج اتصال إنترنت لأن تفريغ الصوت يتم على الخادم. لهذا يفتح التطبيق نسخة الويب المنشورة داخل WebView (`server.url` في `capacitor.config.ts`).
-- لتشغيل نسخة مضمّنة بالكامل داخل الجهاز (بدون WebView للنسخة المنشورة): احذف كتلة `server` من `capacitor.config.ts` ثم أعد `npm run android:sync`. في هذه الحالة سيتوقف تفريغ الصوت ما لم توجّهه إلى خادم خارجي.
-- الديون والجيب تُحفظ محليًا في الجهاز كما هي.
+- التطبيق **مستقل**: لا يوجد `server.url` في `capacitor.config.ts`، وواجهة التطبيق تُحمّل من الملفات المحلية داخل `android/app/src/main/assets/public`.
+- `npm run android:sync` يبني الويب، ثم يولّد صفحة `index.html` ثابتة (`scripts/prerender-index.mjs`)، ثم ينسخها إلى `dist` ويشغّل `cap sync android`.
+- إذن الميكروفون (`RECORD_AUDIO`) مضاف في `AndroidManifest.xml` ويُطلب تلقائيًا عند فتح التطبيق.
+- الديون والجيب تُحفظ محليًا في الجهاز وتعمل بدون إنترنت.
+- الإدخال الصوتي فقط يحتاج إنترنت (تفريغ الصوت على الخادم) ويستدعي `https://voice-debt-pocket.lovable.app/api/public/transcribe`.
 - تغيير رقم الإصدار: `versionCode` و `versionName` في `android/app/build.gradle`.
+
