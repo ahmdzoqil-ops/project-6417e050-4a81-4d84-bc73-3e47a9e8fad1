@@ -35,6 +35,12 @@ import {
 } from "@/lib/storage";
 import { transcribeAudio } from "@/lib/transcribe.functions";
 import { isNativeApp, transcribeViaRemote } from "@/lib/transcribeRemote";
+import {
+  ensureSpeechPermission,
+  isNativeSpeechAvailable,
+  startNativeListening,
+} from "@/lib/nativeSpeech";
+
 import { parseArabicVoice } from "@/lib/parseArabicVoice";
 
 export const Route = createFileRoute("/")({
