@@ -704,7 +704,11 @@ function VoicePanel({
         setState("idle");
       } catch (err) {
         console.error(err);
-        toast.error("تعذّر تحويل الصوت. حاول مرة أخرى");
+        const detail = err instanceof Error ? err.message : String(err);
+        toast.error("تعذّر تحويل الصوت", {
+          description: detail.slice(0, 400),
+          duration: 12000,
+        });
         setState("idle");
       }
     };
