@@ -35,6 +35,12 @@ import {
 } from "@/lib/storage";
 import { transcribeAudio } from "@/lib/transcribe.functions";
 import { isNativeApp, transcribeViaRemote } from "@/lib/transcribeRemote";
+import {
+  ensureSpeechPermission,
+  isNativeSpeechAvailable,
+  startNativeListening,
+} from "@/lib/nativeSpeech";
+
 import { parseArabicVoice } from "@/lib/parseArabicVoice";
 
 export const Route = createFileRoute("/")({
@@ -625,6 +631,8 @@ function VoicePanel({
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const stopNativeRef = useRef<null | (() => Promise<string>)>(null);
+
   const cleanupStream = () => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
@@ -634,8 +642,73 @@ function VoicePanel({
 
   useEffect(() => cleanupStream, []);
 
+  const handleText = (text: string) => {
+    if (!text) {
+      toast.error("لم يتم الفهم. حاول مرة أخرى بوضوح");
+      setState("idle");
+      return;
+    }
+    const parsed = parseArabicVoice(text);
+    setPending({
+      type: parsed.type ?? "debt",
+      name: parsed.name,
+      amount: parsed.amount != null ? String(parsed.amount) : "",
+      rawText: text,
+    });
+    setState("idle");
+  };
+
+  // مسار أندرويد: محرك التعرف على الكلام داخل الجهاز (بدون إنترنت)
+  const startNative = async () => {
+    try {
+      const ok = await ensureSpeechPermission();
+      if (!ok) {
+        toast.error("تم رفض إذن الميكروفون. فعّل الإذن وحاول مرة أخرى");
+        return;
+      }
+      if (!(await isNativeSpeechAvailable())) {
+        toast.error("محرك التعرف على الكلام غير متوفر على هذا الجهاز", {
+          description:
+            "ثبّت تطبيق Google وحمّل حزمة اللغة العربية للاستخدام دون اتصال.",
+          duration: 10000,
+        });
+        return;
+      }
+      stopNativeRef.current = await startNativeListening();
+      setState("recording");
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      toast.error("تعذّر بدء التعرف على الكلام", {
+        description: detail.slice(0, 300),
+        duration: 10000,
+      });
+      setState("idle");
+    }
+  };
+
+  const stopNative = async () => {
+    const stopFn = stopNativeRef.current;
+    stopNativeRef.current = null;
+    setState("processing");
+    try {
+      const text = stopFn ? (await stopFn()).trim() : "";
+      handleText(text);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      toast.error("تعذّر تحويل الصوت", {
+        description: detail.slice(0, 300),
+        duration: 10000,
+      });
+      setState("idle");
+    }
+  };
+
   const start = async () => {
     if (state !== "idle") return;
+    if (isNativeApp()) {
+      await startNative();
+      return;
+    }
     if (
       typeof navigator === "undefined" ||
       !navigator.mediaDevices?.getUserMedia
@@ -651,6 +724,7 @@ function VoicePanel({
       return;
     }
     streamRef.current = stream;
+
 
     const mimeCandidates = [
       "audio/webm;codecs=opus",
@@ -718,6 +792,10 @@ function VoicePanel({
 
   const stop = () => {
     if (state !== "recording") return;
+    if (stopNativeRef.current) {
+      void stopNative();
+      return;
+    }
     try {
       recorderRef.current?.stop();
     } catch {
@@ -725,6 +803,7 @@ function VoicePanel({
       setState("idle");
     }
   };
+
 
   const isRecording = state === "recording";
   const isProcessing = state === "processing";
