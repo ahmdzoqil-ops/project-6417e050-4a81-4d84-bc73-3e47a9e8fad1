@@ -792,6 +792,10 @@ function VoicePanel({
 
   const stop = () => {
     if (state !== "recording") return;
+    if (stopNativeRef.current) {
+      void stopNative();
+      return;
+    }
     try {
       recorderRef.current?.stop();
     } catch {
@@ -799,6 +803,7 @@ function VoicePanel({
       setState("idle");
     }
   };
+
 
   const isRecording = state === "recording";
   const isProcessing = state === "processing";
