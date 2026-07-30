@@ -1,9 +1,22 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Mic, Plus, Search, Pencil, Trash2, Wallet, HandCoins, History, Home, Square, Loader2 } from "lucide-react";
+import {
+  Mic,
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  Wallet,
+  HandCoins,
+  Home,
+  Square,
+  Loader2,
+  Banknote,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -30,9 +43,19 @@ import {
   saveAll,
   pruneOld,
   newId,
+  isToday,
+  loadCustomers,
+  saveCustomers,
+  loadProfile,
+  type Customer,
+  type Profile,
   type Transaction,
   type TxType,
 } from "@/lib/storage";
+import { formatAmount, formatDate, formatTime } from "@/lib/format";
+import { AppMenu } from "@/components/AppMenu";
+import { NameSuggest } from "@/components/NameSuggest";
+import { PaymentSection } from "@/components/PaymentSection";
 import { transcribeAudio } from "@/lib/transcribe.functions";
 import { isNativeApp, transcribeViaRemote } from "@/lib/transcribeRemote";
 import {
@@ -47,38 +70,30 @@ export const Route = createFileRoute("/")({
   component: App,
 });
 
-function formatAmount(n: number) {
-  return new Intl.NumberFormat("ar-EG", { maximumFractionDigits: 2 }).format(n);
-}
-function formatDate(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleDateString("ar-EG", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }) +
-    " " +
-    d.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
-}
-function isSameDay(iso: string, ref = new Date()) {
-  const d = new Date(iso);
-  return (
-    d.getFullYear() === ref.getFullYear() &&
-    d.getMonth() === ref.getMonth() &&
-    d.getDate() === ref.getDate()
-  );
-}
+type NewTx = Omit<Transaction, "id" | "date">;
 
 function App() {
   const [items, setItems] = useState<Transaction[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [profile, setProfile] = useState<Profile>({});
   const [tab, setTab] = useState("home");
   const [hydrated, setHydrated] = useState(false);
 
-  useEffect(() => {
+  const reload = () => {
     const pruned = pruneOld(loadAll());
     saveAll(pruned);
     setItems(pruned);
+    setCustomers(loadCustomers());
+    setProfile(loadProfile());
+  };
+
+  useEffect(() => {
+    reload();
     setHydrated(true);
+    // بداية يوم جديد: إعادة الفحص عند العودة للتطبيق لتصفير اليوم السابق
+    const onFocus = () => reload();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, []);
 
   const persist = (next: Transaction[]) => {
@@ -88,15 +103,19 @@ function App() {
   };
 
   const totals = useMemo(() => {
-    let debt = 0, pocket = 0;
+    let debt = 0,
+      pocket = 0,
+      payment = 0;
     for (const t of items) {
+      if (!isToday(t.date)) continue;
       if (t.type === "debt") debt += t.amount;
-      else pocket += t.amount;
+      else if (t.type === "pocket") pocket += t.amount;
+      else payment += t.amount;
     }
-    return { debt, pocket };
+    return { debt, pocket, payment };
   }, [items]);
 
-  const addTx = (t: Omit<Transaction, "id" | "date">) => {
+  const addTx = (t: NewTx) => {
     persist([{ ...t, id: newId(), date: new Date().toISOString() }, ...items]);
   };
   const updateTx = (id: string, patch: Partial<Transaction>) => {
@@ -104,6 +123,11 @@ function App() {
   };
   const deleteTx = (id: string) => {
     persist(items.filter((t) => t.id !== id));
+  };
+  const addCustomer = (c: Customer) => {
+    const next = [...customers, c];
+    saveCustomers(next);
+    setCustomers(next);
   };
 
   if (!hydrated) {
@@ -113,35 +137,50 @@ function App() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/40">
       <Toaster position="top-center" richColors dir="rtl" />
-      <div className="mx-auto w-full max-w-md px-4 pb-32 pt-6">
-        <header className="mb-4 text-center">
-          <h1 className="text-2xl font-bold tracking-tight">دينك بصوتك</h1>
-          <p className="mt-1 text-xs text-muted-foreground">
-            إدارة الديون والجيب — محليًا على جهازك
-          </p>
+      <div className="mx-auto w-full max-w-md px-4 pb-32 pt-4">
+        <header className="mb-4 flex items-center justify-between">
+          <AppMenu
+            items={items}
+            customers={customers}
+            profile={profile}
+            onProfileChange={setProfile}
+            onAddCustomer={addCustomer}
+            onAddTx={addTx}
+            onReloaded={reload}
+          />
+          <div className="text-center">
+            <h1 className="text-2xl font-bold tracking-tight">دينك بصوتك</h1>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {profile.shopName || "إدارة الديون والجيب — محليًا على جهازك"}
+            </p>
+          </div>
+          <div className="w-9" />
         </header>
 
         <Tabs value={tab} onValueChange={setTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="home" className="gap-1">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="home" className="gap-1 px-1 text-[11px]">
               <Home className="h-4 w-4" /> الرئيسية
             </TabsTrigger>
-            <TabsTrigger value="add" className="gap-1">
+            <TabsTrigger value="add" className="gap-1 px-1 text-[11px]">
               <Plus className="h-4 w-4" /> إضافة
             </TabsTrigger>
-            <TabsTrigger value="debt" className="gap-1">
+            <TabsTrigger value="debt" className="gap-1 px-1 text-[11px]">
               <HandCoins className="h-4 w-4" /> الديون
             </TabsTrigger>
-            <TabsTrigger value="pocket" className="gap-1">
+            <TabsTrigger value="pocket" className="gap-1 px-1 text-[11px]">
               <Wallet className="h-4 w-4" /> الجيب
+            </TabsTrigger>
+            <TabsTrigger value="payment" className="gap-1 px-1 text-[11px]">
+              <Banknote className="h-4 w-4" /> السداد
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="home" className="mt-4">
             <HomeTab
               items={items}
-              totalDebt={totals.debt}
-              totalPocket={totals.pocket}
+              customers={customers}
+              totals={totals}
               onAdd={(payload) => {
                 addTx(payload);
                 toast.success("تم حفظ العملية");
@@ -151,6 +190,8 @@ function App() {
 
           <TabsContent value="add" className="mt-4">
             <AddTab
+              items={items}
+              customers={customers}
               onSave={(payload) => {
                 addTx(payload);
                 toast.success("تم حفظ العملية");
@@ -162,7 +203,7 @@ function App() {
           <TabsContent value="debt" className="mt-4">
             <LogTab
               type="debt"
-              items={items.filter((t) => t.type === "debt")}
+              items={items.filter((t) => t.type === "debt" && isToday(t.date))}
               onUpdate={updateTx}
               onDelete={deleteTx}
             />
@@ -176,6 +217,14 @@ function App() {
               onDelete={deleteTx}
             />
           </TabsContent>
+
+          <TabsContent value="payment" className="mt-4">
+            <PaymentSection
+              items={items}
+              customers={customers}
+              onAdd={addTx}
+            />
+          </TabsContent>
         </Tabs>
       </div>
     </div>
@@ -184,22 +233,24 @@ function App() {
 
 function HomeTab({
   items,
-  totalDebt,
-  totalPocket,
+  customers,
+  totals,
   onAdd,
 }: {
   items: Transaction[];
-  totalDebt: number;
-  totalPocket: number;
-  onAdd: (t: Omit<Transaction, "id" | "date">) => void;
+  customers: Customer[];
+  totals: { debt: number; pocket: number; payment: number };
+  onAdd: (t: NewTx) => void;
 }) {
   const [query, setQuery] = useState("");
 
   const todays = useMemo(
-    () => items.filter((t) => isSameDay(t.date)),
+    () =>
+      items
+        .filter((t) => isToday(t.date))
+        .sort((a, z) => z.date.localeCompare(a.date)),
     [items],
   );
-  const last7 = items; // items are already pruned to last 7 days
 
   const filteredToday = useMemo(() => {
     const q = query.trim();
@@ -207,21 +258,15 @@ function HomeTab({
     return todays.filter((t) => t.name.includes(q));
   }, [todays, query]);
 
-  const filtered7 = useMemo(() => {
-    const q = query.trim();
-    if (!q) return last7;
-    return last7.filter((t) => t.name.includes(q));
-  }, [last7, query]);
-
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <TotalCard label="إجمالي الدين" amount={totalDebt} tone="debt" />
-        <TotalCard label="إجمالي الجيب" amount={totalPocket} tone="pocket" />
+      <div className="grid grid-cols-3 gap-2">
+        <TotalCard label="دين اليوم" amount={totals.debt} tone="debt" />
+        <TotalCard label="الجيب" amount={totals.pocket} tone="pocket" />
+        <TotalCard label="سداد اليوم" amount={totals.payment} tone="payment" />
       </div>
 
-      <VoicePanel onAdd={onAdd} />
-
+      <VoicePanel customers={customers} items={items} onAdd={onAdd} />
 
       <div className="relative">
         <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -235,7 +280,7 @@ function HomeTab({
 
       <section>
         <h2 className="mb-2 text-sm font-semibold text-foreground">
-          آخر عمليات اليوم
+          معاملات اليوم
         </h2>
         {filteredToday.length === 0 ? (
           <EmptyState text="لا توجد عمليات اليوم" />
@@ -246,28 +291,38 @@ function HomeTab({
             ))}
           </ul>
         )}
-      </section>
-
-      <section>
-        <h2 className="mb-2 flex items-center gap-1 text-sm font-semibold text-foreground">
-          <History className="h-4 w-4" /> المعاملات الماضية (آخر 7 أيام)
-        </h2>
-        {filtered7.length === 0 ? (
-          <EmptyState text="لا توجد معاملات في الأسبوع الماضي" />
-        ) : (
-          <ul className="space-y-2">
-            {filtered7.map((t) => (
-              <TxRow key={t.id} tx={t} />
-            ))}
-          </ul>
-        )}
         <p className="mt-2 text-center text-[11px] text-muted-foreground">
-          يتم حذف المعاملات الأقدم من 7 أيام تلقائيًا
+          يبدأ يوم جديد تلقائيًا: يُصفَّر الجيب والدين اليومي والسداد اليومي —
+          والسجل الكامل داخل القائمة العلوية.
         </p>
       </section>
     </div>
   );
 }
+
+const TONES: Record<
+  TxType,
+  { card: string; label: string; value: string; dot: string }
+> = {
+  debt: {
+    card: "border-rose-200 bg-rose-50 dark:border-rose-900/40 dark:bg-rose-950/30",
+    label: "text-rose-700 dark:text-rose-300",
+    value: "text-rose-800 dark:text-rose-200",
+    dot: "bg-rose-500",
+  },
+  pocket: {
+    card: "border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/30",
+    label: "text-emerald-700 dark:text-emerald-300",
+    value: "text-emerald-800 dark:text-emerald-200",
+    dot: "bg-emerald-500",
+  },
+  payment: {
+    card: "border-sky-200 bg-sky-50 dark:border-sky-900/40 dark:bg-sky-950/30",
+    label: "text-sky-700 dark:text-sky-300",
+    value: "text-sky-800 dark:text-sky-200",
+    dot: "bg-sky-500",
+  },
+};
 
 function TotalCard({
   label,
@@ -278,34 +333,12 @@ function TotalCard({
   amount: number;
   tone: TxType;
 }) {
-  const isDebt = tone === "debt";
+  const c = TONES[tone];
   return (
-    <Card
-      className={
-        isDebt
-          ? "border-rose-200 bg-rose-50 dark:border-rose-900/40 dark:bg-rose-950/30"
-          : "border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/30"
-      }
-    >
-      <CardContent className="py-4">
-        <p
-          className={
-            "text-xs font-medium " +
-            (isDebt
-              ? "text-rose-700 dark:text-rose-300"
-              : "text-emerald-700 dark:text-emerald-300")
-          }
-        >
-          {label}
-        </p>
-        <p
-          className={
-            "mt-1 text-2xl font-bold tabular-nums " +
-            (isDebt
-              ? "text-rose-800 dark:text-rose-200"
-              : "text-emerald-800 dark:text-emerald-200")
-          }
-        >
+    <Card className={c.card}>
+      <CardContent className="px-3 py-4">
+        <p className={"text-[11px] font-medium " + c.label}>{label}</p>
+        <p className={"mt-1 text-xl font-bold tabular-nums " + c.value}>
           {formatAmount(amount)}
         </p>
       </CardContent>
@@ -320,28 +353,33 @@ function TxRow({
   tx: Transaction;
   actions?: React.ReactNode;
 }) {
-  const isDebt = tx.type === "debt";
+  const c = TONES[tx.type];
   return (
     <li className="flex items-center justify-between rounded-lg border bg-card p-3 shadow-sm">
       <div className="flex min-w-0 flex-col">
         <div className="flex items-center gap-2">
-          <span
-            className={
-              "inline-block h-2 w-2 rounded-full " +
-              (isDebt ? "bg-rose-500" : "bg-emerald-500")
-            }
-          />
+          <span className={"inline-block h-2 w-2 rounded-full " + c.dot} />
           <span className="truncate font-medium">{tx.name}</span>
         </div>
         <span className="mt-0.5 text-[11px] text-muted-foreground">
-          {formatDate(tx.date)}
+          {isToday(tx.date) ? formatTime(tx.date) : formatDate(tx.date)}
+          {tx.type === "debt"
+            ? " • دين"
+            : tx.type === "pocket"
+              ? " • جيب"
+              : " • سداد"}
+          {tx.note ? ` • ${tx.note}` : ""}
         </span>
       </div>
       <div className="flex items-center gap-2">
         <span
           className={
             "text-sm font-bold tabular-nums " +
-            (isDebt ? "text-rose-600" : "text-emerald-600")
+            (tx.type === "debt"
+              ? "text-rose-600"
+              : tx.type === "pocket"
+                ? "text-emerald-600"
+                : "text-sky-600")
           }
         >
           {formatAmount(tx.amount)}
@@ -361,13 +399,19 @@ function EmptyState({ text }: { text: string }) {
 }
 
 function AddTab({
+  items,
+  customers,
   onSave,
 }: {
-  onSave: (t: Omit<Transaction, "id" | "date">) => void;
+  items: Transaction[];
+  customers: Customer[];
+  onSave: (t: NewTx) => void;
 }) {
   const [type, setType] = useState<TxType>("debt");
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [customerId, setCustomerId] = useState<string | undefined>(undefined);
 
   const submit = () => {
     const trimmed = name.trim();
@@ -380,9 +424,17 @@ function AddTab({
       toast.error("الرجاء إدخال مبلغ صحيح أكبر من صفر");
       return;
     }
-    onSave({ type, name: trimmed, amount: n });
+    onSave({
+      type,
+      name: trimmed,
+      amount: n,
+      note: note.trim() || undefined,
+      customerId: type === "debt" ? customerId : undefined,
+    });
     setName("");
     setAmount("");
+    setNote("");
+    setCustomerId(undefined);
     setType("debt");
   };
 
@@ -396,22 +448,19 @@ function AddTab({
               type="button"
               variant={type === "debt" ? "default" : "outline"}
               onClick={() => setType("debt")}
-              className={
-                type === "debt"
-                  ? "bg-rose-600 hover:bg-rose-700"
-                  : ""
-              }
+              className={type === "debt" ? "bg-rose-600 hover:bg-rose-700" : ""}
             >
               <HandCoins className="ml-1 h-4 w-4" /> دين
             </Button>
             <Button
               type="button"
               variant={type === "pocket" ? "default" : "outline"}
-              onClick={() => setType("pocket")}
+              onClick={() => {
+                setType("pocket");
+                setCustomerId(undefined);
+              }}
               className={
-                type === "pocket"
-                  ? "bg-emerald-600 hover:bg-emerald-700"
-                  : ""
+                type === "pocket" ? "bg-emerald-600 hover:bg-emerald-700" : ""
               }
             >
               <Wallet className="ml-1 h-4 w-4" /> جيب
@@ -419,15 +468,29 @@ function AddTab({
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="name">اسم العميل</Label>
-          <Input
+        {type === "debt" ? (
+          <NameSuggest
             id="name"
+            label="اسم العميل"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={setName}
+            customers={customers}
+            items={items}
+            selectedId={customerId}
+            onSelectCustomer={(c) => setCustomerId(c?.id)}
             placeholder="مثلاً: أحمد"
           />
-        </div>
+        ) : (
+          <div className="space-y-2">
+            <Label htmlFor="name">الاسم</Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="مثلاً: أحمد"
+            />
+          </div>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="amount">المبلغ</Label>
@@ -440,6 +503,17 @@ function AddTab({
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="add-note">ملاحظة (اختياري)</Label>
+          <Textarea
+            id="add-note"
+            rows={2}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="ملاحظة…"
           />
         </div>
 
@@ -470,11 +544,13 @@ function LogTab({
   const [confirming, setConfirming] = useState<Transaction | null>(null);
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
 
   useEffect(() => {
     if (editing) {
       setName(editing.name);
       setAmount(String(editing.amount));
+      setNote(editing.note ?? "");
     }
   }, [editing]);
 
@@ -483,13 +559,13 @@ function LogTab({
   return (
     <div className="space-y-3">
       <TotalCard
-        label={type === "debt" ? "إجمالي الدين" : "إجمالي الجيب"}
+        label={type === "debt" ? "دين اليوم" : "إجمالي الجيب"}
         amount={total}
         tone={type}
       />
       {items.length === 0 ? (
         <EmptyState
-          text={type === "debt" ? "لا توجد ديون مسجلة" : "لا توجد عمليات جيب"}
+          text={type === "debt" ? "لا توجد ديون اليوم" : "لا توجد عمليات جيب"}
         />
       ) : (
         <ul className="space-y-2">
@@ -547,6 +623,15 @@ function LogTab({
                 onChange={(e) => setAmount(e.target.value)}
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-note">ملاحظة (اختياري)</Label>
+              <Textarea
+                id="edit-note"
+                rows={2}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+              />
+            </div>
           </div>
           <DialogFooter className="gap-2 sm:gap-2">
             <Button variant="outline" onClick={() => setEditing(null)}>
@@ -565,7 +650,11 @@ function LogTab({
                   toast.error("الرجاء إدخال مبلغ صحيح أكبر من صفر");
                   return;
                 }
-                onUpdate(editing.id, { name: trimmed, amount: n });
+                onUpdate(editing.id, {
+                  name: trimmed,
+                  amount: n,
+                  note: note.trim() || undefined,
+                });
                 setEditing(null);
                 toast.success("تم تحديث العملية");
               }}
@@ -611,16 +700,22 @@ function LogTab({
 }
 
 type PendingVoice = {
-  type: TxType;
+  type: "debt" | "pocket";
   name: string;
   amount: string;
   rawText: string;
+  note: string;
+  customerId?: string;
 };
 
 function VoicePanel({
+  items,
+  customers,
   onAdd,
 }: {
-  onAdd: (t: Omit<Transaction, "id" | "date">) => void;
+  items: Transaction[];
+  customers: Customer[];
+  onAdd: (t: NewTx) => void;
 }) {
   const transcribe = useServerFn(transcribeAudio);
   const [state, setState] = useState<"idle" | "recording" | "processing">(
@@ -650,10 +745,11 @@ function VoicePanel({
     }
     const parsed = parseArabicVoice(text);
     setPending({
-      type: parsed.type ?? "debt",
+      type: parsed.type === "pocket" ? "pocket" : "debt",
       name: parsed.name,
       amount: parsed.amount != null ? String(parsed.amount) : "",
       rawText: text,
+      note: "",
     });
     setState("idle");
   };
@@ -725,7 +821,6 @@ function VoicePanel({
     }
     streamRef.current = stream;
 
-
     const mimeCandidates = [
       "audio/webm;codecs=opus",
       "audio/webm",
@@ -738,7 +833,9 @@ function VoicePanel({
           typeof MediaRecorder !== "undefined" &&
           MediaRecorder.isTypeSupported?.(m),
       ) ?? "";
-    const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+    const rec = mime
+      ? new MediaRecorder(stream, { mimeType: mime })
+      : new MediaRecorder(stream);
     recorderRef.current = rec;
     chunksRef.current = [];
 
@@ -763,19 +860,7 @@ function VoicePanel({
           : await transcribe({
               data: { audioBase64: base64, mime: blobType },
             });
-        if (!text) {
-          toast.error("لم يتم الفهم. حاول مرة أخرى بوضوح");
-          setState("idle");
-          return;
-        }
-        const parsed = parseArabicVoice(text);
-        setPending({
-          type: parsed.type ?? "debt",
-          name: parsed.name,
-          amount: parsed.amount != null ? String(parsed.amount) : "",
-          rawText: text,
-        });
-        setState("idle");
+        handleText(text);
       } catch (err) {
         console.error(err);
         const detail = err instanceof Error ? err.message : String(err);
@@ -803,7 +888,6 @@ function VoicePanel({
       setState("idle");
     }
   };
-
 
   const isRecording = state === "recording";
   const isProcessing = state === "processing";
@@ -848,6 +932,8 @@ function VoicePanel({
 
       <VoiceConfirmDialog
         pending={pending}
+        items={items}
+        customers={customers}
         onCancel={() => setPending(null)}
         onSave={(p) => {
           const n = Number(p.amount);
@@ -859,7 +945,13 @@ function VoicePanel({
             toast.error("الرجاء إدخال مبلغ صحيح أكبر من صفر");
             return;
           }
-          onAdd({ type: p.type, name: p.name.trim(), amount: n });
+          onAdd({
+            type: p.type,
+            name: p.name.trim(),
+            amount: n,
+            note: p.note.trim() || undefined,
+            customerId: p.type === "debt" ? p.customerId : undefined,
+          });
           setPending(null);
         }}
       />
@@ -869,10 +961,14 @@ function VoicePanel({
 
 function VoiceConfirmDialog({
   pending,
+  items,
+  customers,
   onCancel,
   onSave,
 }: {
   pending: PendingVoice | null;
+  items: Transaction[];
+  customers: Customer[];
   onCancel: () => void;
   onSave: (p: PendingVoice) => void;
 }) {
@@ -886,7 +982,7 @@ function VoiceConfirmDialog({
         if (!o) onCancel();
       }}
     >
-      <DialogContent dir="rtl">
+      <DialogContent dir="rtl" className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>تأكيد العملية الصوتية</DialogTitle>
         </DialogHeader>
@@ -911,7 +1007,9 @@ function VoiceConfirmDialog({
                 <Button
                   type="button"
                   variant={draft.type === "pocket" ? "default" : "outline"}
-                  onClick={() => setDraft({ ...draft, type: "pocket" })}
+                  onClick={() =>
+                    setDraft({ ...draft, type: "pocket", customerId: undefined })
+                  }
                   className={
                     draft.type === "pocket"
                       ? "bg-emerald-600 hover:bg-emerald-700"
@@ -922,15 +1020,34 @@ function VoiceConfirmDialog({
                 </Button>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="v-name">اسم العميل</Label>
-              <Input
+            {draft.type === "debt" ? (
+              <NameSuggest
                 id="v-name"
+                label="اسم العميل"
                 value={draft.name}
-                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                placeholder="اسم العميل"
+                onChange={(v) => setDraft({ ...draft, name: v })}
+                customers={customers}
+                items={items}
+                selectedId={draft.customerId}
+                onSelectCustomer={(c) =>
+                  setDraft({
+                    ...draft,
+                    customerId: c?.id,
+                    name: c ? c.name : draft.name,
+                  })
+                }
               />
-            </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="v-name">الاسم</Label>
+                <Input
+                  id="v-name"
+                  value={draft.name}
+                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                  placeholder="الاسم"
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="v-amount">المبلغ</Label>
               <Input
@@ -941,6 +1058,15 @@ function VoiceConfirmDialog({
                 value={draft.amount}
                 onChange={(e) => setDraft({ ...draft, amount: e.target.value })}
                 placeholder="0"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="v-note">ملاحظة (اختياري)</Label>
+              <Textarea
+                id="v-note"
+                rows={2}
+                value={draft.note}
+                onChange={(e) => setDraft({ ...draft, note: e.target.value })}
               />
             </div>
           </div>
