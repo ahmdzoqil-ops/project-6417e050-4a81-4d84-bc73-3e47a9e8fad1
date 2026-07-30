@@ -860,7 +860,7 @@ function VoicePanel({
           : await transcribe({
               data: { audioBase64: base64, mime: blobType },
             });
-        handleText(text);
+        handleText(text ?? "");
       } catch (err) {
         console.error(err);
         const detail = err instanceof Error ? err.message : String(err);
