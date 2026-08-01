@@ -86,6 +86,7 @@ function App() {
   const [profile, setProfile] = useState<Profile>({});
   const [tab, setTab] = useState("home");
   const [hydrated, setHydrated] = useState(false);
+  const [adding, setAdding] = useState(false);
 
 
   const reload = () => {
