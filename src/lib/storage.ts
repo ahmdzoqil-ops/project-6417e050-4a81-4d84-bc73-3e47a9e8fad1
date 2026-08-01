@@ -102,6 +102,8 @@ export function pruneOld(list: Transaction[]): Transaction[] {
     const ts = new Date(t.date).getTime();
     if (t.type === "pocket") return ts >= todayStart;
     if (t.type === "payment" && t.cash && !t.customerId) return ts >= dayAgo;
+    // دين يومي تم تسليمه: يبقى حتى نهاية يومه فقط
+    if (t.type === "debt" && t.delivered && !t.customerId) return ts >= todayStart;
     if (t.customerId) return true;
     return ts >= sixMonthsAgo;
   });
