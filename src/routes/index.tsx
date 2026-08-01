@@ -87,13 +87,6 @@ function App() {
   const [tab, setTab] = useState("home");
   const [hydrated, setHydrated] = useState(false);
 
-  const reload = () => {
-    const pruned = pruneOld(loadAll());
-    saveAll(pruned);
-    setItems(pruned);
-    setCustomers(loadCustomers());
-    setProfile(loadProfile());
-  };
 
   const reload = () => {
     const pruned = pruneOld(loadAll());
