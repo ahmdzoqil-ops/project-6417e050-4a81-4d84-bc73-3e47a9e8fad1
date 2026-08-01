@@ -416,147 +416,18 @@ function EmptyState({ text }: { text: string }) {
   );
 }
 
-function AddTab({
-  items,
-  customers,
-  onSave,
-}: {
-  items: Transaction[];
-  customers: Customer[];
-  onSave: (t: NewTx) => void;
-}) {
-  const [type, setType] = useState<TxType>("debt");
-  const [name, setName] = useState("");
-  const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
-  const [customerId, setCustomerId] = useState<string | undefined>(undefined);
-
-  const submit = () => {
-    const trimmed = name.trim();
-    const n = Number(amount);
-    if (!trimmed) {
-      toast.error("الرجاء إدخال اسم العميل");
-      return;
-    }
-    if (!Number.isFinite(n) || n <= 0) {
-      toast.error("الرجاء إدخال مبلغ صحيح أكبر من صفر");
-      return;
-    }
-    onSave({
-      type,
-      name: trimmed,
-      amount: n,
-      note: note.trim() || undefined,
-      customerId: type === "debt" ? customerId : undefined,
-    });
-    setName("");
-    setAmount("");
-    setNote("");
-    setCustomerId(undefined);
-    setType("debt");
-  };
-
-  return (
-    <Card>
-      <CardContent className="space-y-4 py-5">
-        <div>
-          <Label className="mb-2 block">النوع</Label>
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              type="button"
-              variant={type === "debt" ? "default" : "outline"}
-              onClick={() => setType("debt")}
-              className={type === "debt" ? "bg-rose-600 hover:bg-rose-700" : ""}
-            >
-              <HandCoins className="ml-1 h-4 w-4" /> دين
-            </Button>
-            <Button
-              type="button"
-              variant={type === "pocket" ? "default" : "outline"}
-              onClick={() => {
-                setType("pocket");
-                setCustomerId(undefined);
-              }}
-              className={
-                type === "pocket" ? "bg-emerald-600 hover:bg-emerald-700" : ""
-              }
-            >
-              <Wallet className="ml-1 h-4 w-4" /> جيب
-            </Button>
-          </div>
-        </div>
-
-        {type === "debt" ? (
-          <NameSuggest
-            id="name"
-            label="اسم العميل"
-            value={name}
-            onChange={setName}
-            customers={customers}
-            items={items}
-            selectedId={customerId}
-            onSelectCustomer={(c) => setCustomerId(c?.id)}
-            placeholder="مثلاً: أحمد"
-          />
-        ) : (
-          <div className="space-y-2">
-            <Label htmlFor="name">الاسم</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="مثلاً: أحمد"
-            />
-          </div>
-        )}
-
-        <div className="space-y-2">
-          <Label htmlFor="amount">المبلغ</Label>
-          <Input
-            id="amount"
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="0.01"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="0"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="add-note">ملاحظة (اختياري)</Label>
-          <Textarea
-            id="add-note"
-            rows={2}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="ملاحظة…"
-          />
-        </div>
-
-        <div className="text-xs text-muted-foreground">
-          التاريخ: {new Date().toLocaleDateString("ar-EG")} (يُسجل تلقائيًا)
-        </div>
-
-        <Button onClick={submit} className="w-full" size="lg">
-          حفظ العملية
-        </Button>
-      </CardContent>
-    </Card>
-  );
-}
-
 function LogTab({
   type,
   items,
   onUpdate,
   onDelete,
+  onToggleDelivered,
 }: {
   type: TxType;
   items: Transaction[];
   onUpdate: (id: string, patch: Partial<Transaction>) => void;
   onDelete: (id: string) => void;
+  onToggleDelivered?: (t: Transaction) => void;
 }) {
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [confirming, setConfirming] = useState<Transaction | null>(null);
@@ -572,46 +443,83 @@ function LogTab({
     }
   }, [editing]);
 
-  const total = items.reduce((s, t) => s + t.amount, 0);
+  const sorted = useMemo(
+    () =>
+      [...items].sort((a, z) => {
+        const d = Number(!!a.delivered) - Number(!!z.delivered);
+        return d !== 0 ? d : z.date.localeCompare(a.date);
+      }),
+    [items],
+  );
+  const total = sorted
+    .filter((t) => !t.delivered)
+    .reduce((s, t) => s + t.amount, 0);
+  const deliveredTotal = sorted
+    .filter((t) => t.delivered)
+    .reduce((s, t) => s + t.amount, 0);
 
   return (
     <div className="space-y-3">
       <TotalCard
-        label={type === "debt" ? "دين اليوم" : "إجمالي الجيب"}
+        label={type === "debt" ? "دين اليوم (المتبقي)" : "إجمالي الجيب"}
         amount={total}
         tone={type}
       />
-      {items.length === 0 ? (
+      {type === "debt" && deliveredTotal > 0 && (
+        <p className="text-center text-[11px] text-muted-foreground">
+          تم تسليم: {formatAmount(deliveredTotal)} — يُحذف تلقائيًا مع بداية يوم
+          جديد
+        </p>
+      )}
+      {sorted.length === 0 ? (
         <EmptyState
           text={type === "debt" ? "لا توجد ديون اليوم" : "لا توجد عمليات جيب"}
         />
       ) : (
         <ul className="space-y-2">
-          {items.map((t) => (
-            <TxRow
-              key={t.id}
-              tx={t}
-              actions={
-                <div className="flex items-center gap-1">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => setEditing(t)}
-                    aria-label="تعديل"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => setConfirming(t)}
-                    aria-label="حذف"
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              }
-            />
+          {sorted.map((t) => (
+            <div key={t.id} className={t.delivered ? "opacity-60" : ""}>
+              <TxRow
+                tx={t}
+                actions={
+                  <div className="flex items-center gap-1">
+                    {onToggleDelivered && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => onToggleDelivered(t)}
+                        aria-label={t.delivered ? "إلغاء التسليم" : "تم التسليم"}
+                      >
+                        <CheckCircle2
+                          className={
+                            "h-4 w-4 " +
+                            (t.delivered
+                              ? "text-emerald-600"
+                              : "text-muted-foreground")
+                          }
+                        />
+                      </Button>
+                    )}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => setEditing(t)}
+                      aria-label="تعديل"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => setConfirming(t)}
+                      aria-label="حذف"
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                }
+              />
+            </div>
           ))}
         </ul>
       )}
