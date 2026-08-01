@@ -1,66 +1,51 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
-import { NameSuggest } from "@/components/NameSuggest";
-import { formatAmount, formatTime } from "@/lib/format";
 import {
-  isToday,
-  type Customer,
-  type Transaction,
-} from "@/lib/storage";
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Pencil, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { formatAmount, formatTime } from "@/lib/format";
+import { isToday, type Transaction } from "@/lib/storage";
 
-type NewTx = Omit<Transaction, "id" | "date">;
-
-/** قسم السداد: سداد دين مرتبط بعميل، أو نقد عابر. إدخال يدوي فقط بدون صوت. */
+/**
+ * قسم السداد: عرض فقط لعمليات سداد اليوم مع تعديل/حذف.
+ * الإضافة تتم من زر (+) المركزي أو من كشف حساب العميل.
+ */
 export function PaymentSection({
   items,
-  customers,
-  onAdd,
+  onUpdate,
+  onDelete,
 }: {
   items: Transaction[];
-  customers: Customer[];
-  onAdd: (t: NewTx) => void;
+  onUpdate: (id: string, patch: Partial<Transaction>) => void;
+  onDelete: (id: string) => void;
 }) {
-  const [mode, setMode] = useState<"debt" | "cash">("debt");
+  const [editing, setEditing] = useState<Transaction | null>(null);
   const [name, setName] = useState("");
-  const [customerId, setCustomerId] = useState<string | undefined>(undefined);
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
 
-  const todayPayments = items.filter(
-    (t) => t.type === "payment" && isToday(t.date),
-  );
-  const total = todayPayments.reduce((s, t) => s + t.amount, 0);
+  useEffect(() => {
+    if (editing) {
+      setName(editing.name);
+      setAmount(String(editing.amount));
+      setNote(editing.note ?? "");
+    }
+  }, [editing]);
 
-  const submit = () => {
-    const trimmed = name.trim();
-    const n = Number(amount);
-    if (!trimmed) {
-      toast.error("الرجاء إدخال الاسم");
-      return;
-    }
-    if (!Number.isFinite(n) || n <= 0) {
-      toast.error("الرجاء إدخال مبلغ صحيح أكبر من صفر");
-      return;
-    }
-    onAdd({
-      type: "payment",
-      name: trimmed,
-      amount: n,
-      note: note.trim() || undefined,
-      customerId: mode === "debt" ? customerId : undefined,
-      cash: mode === "cash" ? true : undefined,
-    });
-    setName("");
-    setAmount("");
-    setNote("");
-    setCustomerId(undefined);
-    toast.success("تم حفظ عملية السداد");
-  };
+  const todayPayments = items
+    .filter((t) => t.type === "payment" && isToday(t.date))
+    .sort((a, z) => z.date.localeCompare(a.date));
+  const total = todayPayments.reduce((s, t) => s + t.amount, 0);
 
   return (
     <div className="space-y-4">
@@ -75,120 +60,112 @@ export function PaymentSection({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardContent className="space-y-4 py-5">
-          <div>
-            <Label className="mb-2 block">نوع العملية</Label>
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                type="button"
-                variant={mode === "debt" ? "default" : "outline"}
-                className={mode === "debt" ? "bg-sky-600 hover:bg-sky-700" : ""}
-                onClick={() => setMode("debt")}
-              >
-                سداد دين
-              </Button>
-              <Button
-                type="button"
-                variant={mode === "cash" ? "default" : "outline"}
-                className={mode === "cash" ? "bg-sky-600 hover:bg-sky-700" : ""}
-                onClick={() => {
-                  setMode("cash");
-                  setCustomerId(undefined);
-                }}
-              >
-                نقد
-              </Button>
-            </div>
-          </div>
-
-          {mode === "debt" ? (
-            <NameSuggest
-              id="pay-name"
-              label="اسم العميل"
-              value={name}
-              onChange={setName}
-              customers={customers}
-              items={items}
-              selectedId={customerId}
-              onSelectCustomer={(c) => setCustomerId(c?.id)}
-            />
-          ) : (
-            <div className="space-y-2">
-              <Label htmlFor="cash-name">الاسم</Label>
-              <Input
-                id="cash-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="اسم الشخص"
-              />
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="pay-amount">المبلغ</Label>
-            <Input
-              id="pay-amount"
-              type="number"
-              inputMode="decimal"
-              min="0"
-              step="0.01"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="pay-note">ملاحظة (اختياري)</Label>
-            <Textarea
-              id="pay-note"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="ملاحظة…"
-              rows={2}
-            />
-          </div>
-
-          <Button onClick={submit} className="w-full" size="lg">
-            حفظ السداد
-          </Button>
-          <p className="text-center text-[11px] text-muted-foreground">
-            سداد النقد العابر يُحفظ 24 ساعة فقط، والسداد المرتبط بعميل يُحفظ في
-            كشف حسابه.
-          </p>
-        </CardContent>
-      </Card>
-
-      <section>
-        <h2 className="mb-2 text-sm font-semibold">سداد اليوم</h2>
-        {todayPayments.length === 0 ? (
-          <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-            لا توجد عمليات سداد اليوم
-          </div>
-        ) : (
-          <ul className="space-y-2">
-            {todayPayments.map((t) => (
-              <li
-                key={t.id}
-                className="rounded-lg border bg-card p-3 text-sm shadow-sm"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{t.name}</span>
+      {todayPayments.length === 0 ? (
+        <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+          لا توجد عمليات سداد اليوم — أضفها من زر (+)
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {todayPayments.map((t) => (
+            <li key={t.id} className="rounded-lg border bg-card p-3 text-sm shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="font-medium">{t.name}</span>
+                <div className="flex items-center gap-1">
                   <span className="font-bold tabular-nums text-sky-600">
                     {formatAmount(t.amount)}
                   </span>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label="تعديل"
+                    onClick={() => setEditing(t)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label="حذف"
+                    onClick={() => {
+                      onDelete(t.id);
+                      toast.success("تم الحذف");
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
                 </div>
-                <div className="mt-0.5 text-[11px] text-muted-foreground">
-                  {formatTime(t.date)}
-                  {t.cash ? " • نقد" : t.customerId ? " • مرتبط بعميل" : ""}
-                  {t.note ? ` • ${t.note}` : ""}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+              </div>
+              <div className="mt-0.5 text-[11px] text-muted-foreground">
+                {formatTime(t.date)}
+                {t.cash ? " • نقد" : t.customerId ? " • مرتبط بعميل" : ""}
+                {t.note ? ` • ${t.note}` : ""}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent dir="rtl">
+          <DialogHeader>
+            <DialogTitle>تعديل عملية السداد</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="pe-name">الاسم</Label>
+              <Input id="pe-name" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pe-amount">المبلغ</Label>
+              <Input
+                id="pe-amount"
+                type="number"
+                min="0"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pe-note">ملاحظة (اختياري)</Label>
+              <Textarea
+                id="pe-note"
+                rows={2}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setEditing(null)}>
+              إلغاء
+            </Button>
+            <Button
+              onClick={() => {
+                if (!editing) return;
+                const n = Number(amount);
+                if (!name.trim()) {
+                  toast.error("الرجاء إدخال الاسم");
+                  return;
+                }
+                if (!Number.isFinite(n) || n <= 0) {
+                  toast.error("الرجاء إدخال مبلغ صحيح أكبر من صفر");
+                  return;
+                }
+                onUpdate(editing.id, {
+                  name: name.trim(),
+                  amount: n,
+                  note: note.trim() || undefined,
+                });
+                setEditing(null);
+                toast.success("تم تحديث العملية");
+              }}
+            >
+              حفظ
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
