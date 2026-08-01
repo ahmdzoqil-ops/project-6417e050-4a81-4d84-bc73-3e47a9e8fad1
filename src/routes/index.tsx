@@ -852,7 +852,7 @@ function VoicePanel({
                 : "اضغط وتكلم"}
           </p>
           <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
-            مثال: «دين أحمد خمسمائة» أو «جيب سعيد ألف وخمسمائة»
+            قل الاسم ثم المبلغ — مثال: «محمد خمسة آلاف»
           </p>
         </CardContent>
       </Card>
