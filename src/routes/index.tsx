@@ -170,12 +170,9 @@ function App() {
         </header>
 
         <Tabs value={tab} onValueChange={setTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="home" className="gap-1 px-1 text-[11px]">
               <Home className="h-4 w-4" /> الرئيسية
-            </TabsTrigger>
-            <TabsTrigger value="add" className="gap-1 px-1 text-[11px]">
-              <Plus className="h-4 w-4" /> إضافة
             </TabsTrigger>
             <TabsTrigger value="debt" className="gap-1 px-1 text-[11px]">
               <HandCoins className="h-4 w-4" /> الديون
@@ -200,24 +197,15 @@ function App() {
             />
           </TabsContent>
 
-          <TabsContent value="add" className="mt-4">
-            <AddTab
-              items={items}
-              customers={customers}
-              onSave={(payload) => {
-                addTx(payload);
-                toast.success("تم حفظ العملية");
-                setTab("home");
-              }}
-            />
-          </TabsContent>
-
           <TabsContent value="debt" className="mt-4">
             <LogTab
               type="debt"
-              items={items.filter((t) => t.type === "debt" && isToday(t.date))}
+              items={dailyDebts(items)}
               onUpdate={updateTx}
               onDelete={deleteTx}
+              onToggleDelivered={(t) =>
+                updateTx(t.id, { delivered: !t.delivered })
+              }
             />
           </TabsContent>
 
@@ -233,12 +221,29 @@ function App() {
           <TabsContent value="payment" className="mt-4">
             <PaymentSection
               items={items}
-              customers={customers}
-              onAdd={addTx}
+              onUpdate={updateTx}
+              onDelete={deleteTx}
             />
           </TabsContent>
         </Tabs>
       </div>
+
+      <button
+        type="button"
+        aria-label="إضافة عملية"
+        onClick={() => setAdding(true)}
+        className="fixed bottom-6 left-1/2 z-40 flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl transition-transform active:scale-95"
+      >
+        <Plus className="h-8 w-8" />
+      </button>
+
+      <AddDialog
+        open={adding}
+        onOpenChange={setAdding}
+        items={items}
+        customers={customers}
+        onSave={addTx}
+      />
     </div>
   );
 }
