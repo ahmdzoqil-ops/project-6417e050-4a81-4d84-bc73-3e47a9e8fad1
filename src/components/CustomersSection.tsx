@@ -20,6 +20,7 @@ import {
   type Customer,
   type Transaction,
 } from "@/lib/storage";
+import { matchesQuery } from "@/lib/derive";
 
 type NewTx = Omit<Transaction, "id" | "date">;
 
@@ -40,10 +41,10 @@ export function CustomersSection({
   const [phone, setPhone] = useState("");
   const [openCustomer, setOpenCustomer] = useState<Customer | null>(null);
 
-  const filtered = useMemo(() => {
-    const q = query.trim();
-    return q ? customers.filter((c) => c.name.includes(q)) : customers;
-  }, [customers, query]);
+  const filtered = useMemo(
+    () => customers.filter((c) => matchesQuery(c.name, query)),
+    [customers, query],
+  );
 
   if (openCustomer) {
     return (

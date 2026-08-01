@@ -13,6 +13,7 @@ import {
   Square,
   Loader2,
   Banknote,
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,8 +54,17 @@ import {
   type TxType,
 } from "@/lib/storage";
 import { formatAmount, formatDate, formatTime } from "@/lib/format";
+import {
+  dailyDebts,
+  matchesQuery,
+  dailyDebtTotal,
+  paymentTotalToday,
+  pocketTotal,
+  syncAutoCustomers,
+} from "@/lib/derive";
 import { AppMenu } from "@/components/AppMenu";
 import { NameSuggest } from "@/components/NameSuggest";
+import { AddDialog } from "@/components/AddDialog";
 import { PaymentSection } from "@/components/PaymentSection";
 import { transcribeAudio } from "@/lib/transcribe.functions";
 import { isNativeApp, transcribeViaRemote } from "@/lib/transcribeRemote";
@@ -78,12 +88,16 @@ function App() {
   const [profile, setProfile] = useState<Profile>({});
   const [tab, setTab] = useState("home");
   const [hydrated, setHydrated] = useState(false);
+  const [adding, setAdding] = useState(false);
+
 
   const reload = () => {
     const pruned = pruneOld(loadAll());
-    saveAll(pruned);
-    setItems(pruned);
-    setCustomers(loadCustomers());
+    const sync = syncAutoCustomers(pruned, loadCustomers());
+    saveAll(sync.items);
+    if (sync.changed) saveCustomers(sync.customers);
+    setItems(sync.items);
+    setCustomers(sync.customers);
     setProfile(loadProfile());
   };
 
@@ -98,22 +112,23 @@ function App() {
 
   const persist = (next: Transaction[]) => {
     const pruned = pruneOld(next);
-    saveAll(pruned);
-    setItems(pruned);
+    const sync = syncAutoCustomers(pruned, loadCustomers());
+    saveAll(sync.items);
+    if (sync.changed) {
+      saveCustomers(sync.customers);
+      setCustomers(sync.customers);
+    }
+    setItems(sync.items);
   };
 
-  const totals = useMemo(() => {
-    let debt = 0,
-      pocket = 0,
-      payment = 0;
-    for (const t of items) {
-      if (!isToday(t.date)) continue;
-      if (t.type === "debt") debt += t.amount;
-      else if (t.type === "pocket") pocket += t.amount;
-      else payment += t.amount;
-    }
-    return { debt, pocket, payment };
-  }, [items]);
+  const totals = useMemo(
+    () => ({
+      debt: dailyDebtTotal(items),
+      pocket: pocketTotal(items),
+      payment: paymentTotalToday(items),
+    }),
+    [items],
+  );
 
   const addTx = (t: NewTx) => {
     persist([{ ...t, id: newId(), date: new Date().toISOString() }, ...items]);
@@ -158,12 +173,9 @@ function App() {
         </header>
 
         <Tabs value={tab} onValueChange={setTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="home" className="gap-1 px-1 text-[11px]">
               <Home className="h-4 w-4" /> الرئيسية
-            </TabsTrigger>
-            <TabsTrigger value="add" className="gap-1 px-1 text-[11px]">
-              <Plus className="h-4 w-4" /> إضافة
             </TabsTrigger>
             <TabsTrigger value="debt" className="gap-1 px-1 text-[11px]">
               <HandCoins className="h-4 w-4" /> الديون
@@ -188,24 +200,15 @@ function App() {
             />
           </TabsContent>
 
-          <TabsContent value="add" className="mt-4">
-            <AddTab
-              items={items}
-              customers={customers}
-              onSave={(payload) => {
-                addTx(payload);
-                toast.success("تم حفظ العملية");
-                setTab("home");
-              }}
-            />
-          </TabsContent>
-
           <TabsContent value="debt" className="mt-4">
             <LogTab
               type="debt"
-              items={items.filter((t) => t.type === "debt" && isToday(t.date))}
+              items={dailyDebts(items)}
               onUpdate={updateTx}
               onDelete={deleteTx}
+              onToggleDelivered={(t) =>
+                updateTx(t.id, { delivered: !t.delivered })
+              }
             />
           </TabsContent>
 
@@ -221,12 +224,29 @@ function App() {
           <TabsContent value="payment" className="mt-4">
             <PaymentSection
               items={items}
-              customers={customers}
-              onAdd={addTx}
+              onUpdate={updateTx}
+              onDelete={deleteTx}
             />
           </TabsContent>
         </Tabs>
       </div>
+
+      <button
+        type="button"
+        aria-label="إضافة عملية"
+        onClick={() => setAdding(true)}
+        className="fixed bottom-6 left-1/2 z-40 flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl transition-transform active:scale-95"
+      >
+        <Plus className="h-8 w-8" />
+      </button>
+
+      <AddDialog
+        open={adding}
+        onOpenChange={setAdding}
+        items={items}
+        customers={customers}
+        onSave={addTx}
+      />
     </div>
   );
 }
@@ -252,11 +272,10 @@ function HomeTab({
     [items],
   );
 
-  const filteredToday = useMemo(() => {
-    const q = query.trim();
-    if (!q) return todays;
-    return todays.filter((t) => t.name.includes(q));
-  }, [todays, query]);
+  const filteredToday = useMemo(
+    () => todays.filter((t) => matchesQuery(t.name, query)),
+    [todays, query],
+  );
 
   return (
     <div className="space-y-4">
@@ -398,147 +417,18 @@ function EmptyState({ text }: { text: string }) {
   );
 }
 
-function AddTab({
-  items,
-  customers,
-  onSave,
-}: {
-  items: Transaction[];
-  customers: Customer[];
-  onSave: (t: NewTx) => void;
-}) {
-  const [type, setType] = useState<TxType>("debt");
-  const [name, setName] = useState("");
-  const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
-  const [customerId, setCustomerId] = useState<string | undefined>(undefined);
-
-  const submit = () => {
-    const trimmed = name.trim();
-    const n = Number(amount);
-    if (!trimmed) {
-      toast.error("الرجاء إدخال اسم العميل");
-      return;
-    }
-    if (!Number.isFinite(n) || n <= 0) {
-      toast.error("الرجاء إدخال مبلغ صحيح أكبر من صفر");
-      return;
-    }
-    onSave({
-      type,
-      name: trimmed,
-      amount: n,
-      note: note.trim() || undefined,
-      customerId: type === "debt" ? customerId : undefined,
-    });
-    setName("");
-    setAmount("");
-    setNote("");
-    setCustomerId(undefined);
-    setType("debt");
-  };
-
-  return (
-    <Card>
-      <CardContent className="space-y-4 py-5">
-        <div>
-          <Label className="mb-2 block">النوع</Label>
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              type="button"
-              variant={type === "debt" ? "default" : "outline"}
-              onClick={() => setType("debt")}
-              className={type === "debt" ? "bg-rose-600 hover:bg-rose-700" : ""}
-            >
-              <HandCoins className="ml-1 h-4 w-4" /> دين
-            </Button>
-            <Button
-              type="button"
-              variant={type === "pocket" ? "default" : "outline"}
-              onClick={() => {
-                setType("pocket");
-                setCustomerId(undefined);
-              }}
-              className={
-                type === "pocket" ? "bg-emerald-600 hover:bg-emerald-700" : ""
-              }
-            >
-              <Wallet className="ml-1 h-4 w-4" /> جيب
-            </Button>
-          </div>
-        </div>
-
-        {type === "debt" ? (
-          <NameSuggest
-            id="name"
-            label="اسم العميل"
-            value={name}
-            onChange={setName}
-            customers={customers}
-            items={items}
-            selectedId={customerId}
-            onSelectCustomer={(c) => setCustomerId(c?.id)}
-            placeholder="مثلاً: أحمد"
-          />
-        ) : (
-          <div className="space-y-2">
-            <Label htmlFor="name">الاسم</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="مثلاً: أحمد"
-            />
-          </div>
-        )}
-
-        <div className="space-y-2">
-          <Label htmlFor="amount">المبلغ</Label>
-          <Input
-            id="amount"
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="0.01"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="0"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="add-note">ملاحظة (اختياري)</Label>
-          <Textarea
-            id="add-note"
-            rows={2}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="ملاحظة…"
-          />
-        </div>
-
-        <div className="text-xs text-muted-foreground">
-          التاريخ: {new Date().toLocaleDateString("ar-EG")} (يُسجل تلقائيًا)
-        </div>
-
-        <Button onClick={submit} className="w-full" size="lg">
-          حفظ العملية
-        </Button>
-      </CardContent>
-    </Card>
-  );
-}
-
 function LogTab({
   type,
   items,
   onUpdate,
   onDelete,
+  onToggleDelivered,
 }: {
   type: TxType;
   items: Transaction[];
   onUpdate: (id: string, patch: Partial<Transaction>) => void;
   onDelete: (id: string) => void;
+  onToggleDelivered?: (t: Transaction) => void;
 }) {
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [confirming, setConfirming] = useState<Transaction | null>(null);
@@ -554,46 +444,83 @@ function LogTab({
     }
   }, [editing]);
 
-  const total = items.reduce((s, t) => s + t.amount, 0);
+  const sorted = useMemo(
+    () =>
+      [...items].sort((a, z) => {
+        const d = Number(!!a.delivered) - Number(!!z.delivered);
+        return d !== 0 ? d : z.date.localeCompare(a.date);
+      }),
+    [items],
+  );
+  const total = sorted
+    .filter((t) => !t.delivered)
+    .reduce((s, t) => s + t.amount, 0);
+  const deliveredTotal = sorted
+    .filter((t) => t.delivered)
+    .reduce((s, t) => s + t.amount, 0);
 
   return (
     <div className="space-y-3">
       <TotalCard
-        label={type === "debt" ? "دين اليوم" : "إجمالي الجيب"}
+        label={type === "debt" ? "دين اليوم (المتبقي)" : "إجمالي الجيب"}
         amount={total}
         tone={type}
       />
-      {items.length === 0 ? (
+      {type === "debt" && deliveredTotal > 0 && (
+        <p className="text-center text-[11px] text-muted-foreground">
+          تم تسليم: {formatAmount(deliveredTotal)} — يُحذف تلقائيًا مع بداية يوم
+          جديد
+        </p>
+      )}
+      {sorted.length === 0 ? (
         <EmptyState
           text={type === "debt" ? "لا توجد ديون اليوم" : "لا توجد عمليات جيب"}
         />
       ) : (
         <ul className="space-y-2">
-          {items.map((t) => (
-            <TxRow
-              key={t.id}
-              tx={t}
-              actions={
-                <div className="flex items-center gap-1">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => setEditing(t)}
-                    aria-label="تعديل"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => setConfirming(t)}
-                    aria-label="حذف"
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              }
-            />
+          {sorted.map((t) => (
+            <div key={t.id} className={t.delivered ? "opacity-60" : ""}>
+              <TxRow
+                tx={t}
+                actions={
+                  <div className="flex items-center gap-1">
+                    {onToggleDelivered && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => onToggleDelivered(t)}
+                        aria-label={t.delivered ? "إلغاء التسليم" : "تم التسليم"}
+                      >
+                        <CheckCircle2
+                          className={
+                            "h-4 w-4 " +
+                            (t.delivered
+                              ? "text-emerald-600"
+                              : "text-muted-foreground")
+                          }
+                        />
+                      </Button>
+                    )}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => setEditing(t)}
+                      aria-label="تعديل"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => setConfirming(t)}
+                      aria-label="حذف"
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                }
+              />
+            </div>
           ))}
         </ul>
       )}
@@ -925,7 +852,7 @@ function VoicePanel({
                 : "اضغط وتكلم"}
           </p>
           <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
-            مثال: «دين أحمد خمسمائة» أو «جيب سعيد ألف وخمسمائة»
+            قل الاسم ثم المبلغ — مثال: «محمد خمسة آلاف»
           </p>
         </CardContent>
       </Card>

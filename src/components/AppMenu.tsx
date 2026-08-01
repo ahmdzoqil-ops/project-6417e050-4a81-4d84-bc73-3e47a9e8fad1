@@ -116,7 +116,9 @@ export function AppMenu({
             />
           )}
 
-          {view === "history" && <HistorySection items={items} />}
+          {view === "history" && (
+            <HistorySection items={items} customers={customers} />
+          )}
 
           {view === "backup" && <BackupPanel onReloaded={onReloaded} />}
 
