@@ -20,6 +20,7 @@ import {
   type Customer,
   type Transaction,
 } from "@/lib/storage";
+import { matchesQuery } from "@/lib/derive";
 
 type NewTx = Omit<Transaction, "id" | "date">;
 
