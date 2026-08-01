@@ -271,11 +271,10 @@ function HomeTab({
     [items],
   );
 
-  const filteredToday = useMemo(() => {
-    const q = query.trim();
-    if (!q) return todays;
-    return todays.filter((t) => t.name.includes(q));
-  }, [todays, query]);
+  const filteredToday = useMemo(
+    () => todays.filter((t) => matchesQuery(t.name, query)),
+    [todays, query],
+  );
 
   return (
     <div className="space-y-4">
