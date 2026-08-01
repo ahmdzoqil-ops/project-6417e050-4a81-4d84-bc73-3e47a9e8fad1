@@ -11,6 +11,12 @@ export type Transaction = {
   customerId?: string;
   /** سداد نقدي عابر لا علاقة له بالمديونيات */
   cash?: boolean;
+  /** دين يومي تم تسليمه — يُخصم من إجمالي اليوم ويُحذف مع بداية اليوم التالي */
+  delivered?: boolean;
+  /** سداد مرتبط بعملية دين محددة */
+  linkedTxId?: string;
+  /** صور مرفقة (dataURL) */
+  images?: string[];
 };
 
 export type Customer = {
