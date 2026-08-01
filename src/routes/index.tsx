@@ -95,6 +95,16 @@ function App() {
     setProfile(loadProfile());
   };
 
+  const reload = () => {
+    const pruned = pruneOld(loadAll());
+    const sync = syncAutoCustomers(pruned, loadCustomers());
+    saveAll(sync.items);
+    if (sync.changed) saveCustomers(sync.customers);
+    setItems(sync.items);
+    setCustomers(sync.customers);
+    setProfile(loadProfile());
+  };
+
   useEffect(() => {
     reload();
     setHydrated(true);
@@ -106,22 +116,23 @@ function App() {
 
   const persist = (next: Transaction[]) => {
     const pruned = pruneOld(next);
-    saveAll(pruned);
-    setItems(pruned);
+    const sync = syncAutoCustomers(pruned, loadCustomers());
+    saveAll(sync.items);
+    if (sync.changed) {
+      saveCustomers(sync.customers);
+      setCustomers(sync.customers);
+    }
+    setItems(sync.items);
   };
 
-  const totals = useMemo(() => {
-    let debt = 0,
-      pocket = 0,
-      payment = 0;
-    for (const t of items) {
-      if (!isToday(t.date)) continue;
-      if (t.type === "debt") debt += t.amount;
-      else if (t.type === "pocket") pocket += t.amount;
-      else payment += t.amount;
-    }
-    return { debt, pocket, payment };
-  }, [items]);
+  const totals = useMemo(
+    () => ({
+      debt: dailyDebtTotal(items),
+      pocket: pocketTotal(items),
+      payment: paymentTotalToday(items),
+    }),
+    [items],
+  );
 
   const addTx = (t: NewTx) => {
     persist([{ ...t, id: newId(), date: new Date().toISOString() }, ...items]);
