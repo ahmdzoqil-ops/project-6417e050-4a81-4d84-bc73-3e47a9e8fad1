@@ -56,6 +56,7 @@ import {
 import { formatAmount, formatDate, formatTime } from "@/lib/format";
 import {
   dailyDebts,
+  matchesQuery,
   dailyDebtTotal,
   paymentTotalToday,
   pocketTotal,
