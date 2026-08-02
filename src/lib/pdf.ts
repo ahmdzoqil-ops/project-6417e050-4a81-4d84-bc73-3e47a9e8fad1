@@ -71,31 +71,42 @@ async function htmlToPdfBlob(html: string) {
     import("html2canvas"),
     import("jspdf"),
   ]);
-  const host = document.createElement("div");
-  host.style.cssText = "position:fixed;left:-10000px;top:0;";
-  host.innerHTML = html;
-  document.body.appendChild(host);
+  // إطار معزول حتى لا تتأثر عملية الرسم بأنماط التطبيق (oklch غير مدعومة)
+  const frame = document.createElement("iframe");
+  frame.style.cssText = "position:fixed;left:-10000px;top:0;width:900px;height:1400px;border:0";
+  document.body.appendChild(frame);
   try {
-    const canvas = await html2canvas(host.firstElementChild as HTMLElement, {
+    const doc = frame.contentDocument!;
+    doc.open();
+    doc.write(
+      `<!doctype html><html dir="rtl"><head><meta charset="utf-8"></head><body style="margin:0;background:#fff">${html}</body></html>`,
+    );
+    doc.close();
+    await new Promise((r) => setTimeout(r, 60));
+    const target = doc.body.firstElementChild as HTMLElement;
+    const canvas = await html2canvas(target, {
       scale: 2,
       backgroundColor: "#ffffff",
+      windowWidth: 900,
+      windowHeight: target.scrollHeight + 40,
     });
     const pdf = new jsPDF({ unit: "pt", format: "a4" });
     const w = pdf.internal.pageSize.getWidth();
-    const h = (canvas.height * w) / canvas.width;
     const pageH = pdf.internal.pageSize.getHeight();
+    const h = (canvas.height * w) / canvas.width;
     const img = canvas.toDataURL("image/jpeg", 0.92);
-    let y = 0;
     pdf.addImage(img, "JPEG", 0, 0, w, h);
-    y = h;
-    while (y > pageH) {
+    let rest = h - pageH;
+    let offset = pageH;
+    while (rest > 0) {
       pdf.addPage();
-      y -= pageH;
-      pdf.addImage(img, "JPEG", 0, -(h - y), w, h);
+      pdf.addImage(img, "JPEG", 0, -offset, w, h);
+      rest -= pageH;
+      offset += pageH;
     }
     return pdf.output("blob") as Blob;
   } finally {
-    host.remove();
+    frame.remove();
   }
 }
 
