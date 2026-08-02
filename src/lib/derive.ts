@@ -31,9 +31,9 @@ export function matchesQuery(text: string, query: string) {
 
 /* ---------------- اشتقاقات موحّدة ---------------- */
 
-/** ديون اليوم غير المرتبطة بعميل (سجل يومي) */
+/** كل ديون اليوم (سواء كانت مرتبطة بعميل أو لا) */
 export function dailyDebts(items: Transaction[]) {
-  return items.filter((t) => t.type === "debt" && !t.customerId && isToday(t.date));
+  return items.filter((t) => t.type === "debt" && isToday(t.date));
 }
 
 /** إجمالي دين اليوم بعد استبعاد ما تم تسليمه */
@@ -42,6 +42,47 @@ export function dailyDebtTotal(items: Transaction[]) {
     .filter((t) => !t.delivered)
     .reduce((s, t) => s + t.amount, 0);
 }
+
+export type DebtGroup = {
+  key: string;
+  name: string;
+  list: Transaction[];
+  total: number;
+  openTotal: number;
+  delivered: boolean;
+  lastDate: string;
+};
+
+/** تجميع ديون اليوم لكل عميل في بطاقة واحدة */
+export function groupDailyDebts(items: Transaction[]): DebtGroup[] {
+  const map = new Map<string, Transaction[]>();
+  for (const t of dailyDebts(items)) {
+    const key = t.customerId ?? "n:" + normalizeName(t.name);
+    const arr = map.get(key) ?? [];
+    arr.push(t);
+    map.set(key, arr);
+  }
+  return [...map.entries()]
+    .map(([key, list]) => {
+      const sorted = [...list].sort((a, z) => z.date.localeCompare(a.date));
+      return {
+        key,
+        name: sorted[0].name,
+        list: sorted,
+        total: sorted.reduce((s, t) => s + t.amount, 0),
+        openTotal: sorted
+          .filter((t) => !t.delivered)
+          .reduce((s, t) => s + t.amount, 0),
+        delivered: sorted.every((t) => t.delivered),
+        lastDate: sorted[0].date,
+      };
+    })
+    .sort((a, z) => {
+      const d = Number(a.delivered) - Number(z.delivered);
+      return d !== 0 ? d : z.lastDate.localeCompare(a.lastDate);
+    });
+}
+
 
 export function pocketTotal(items: Transaction[]) {
   return items
@@ -84,10 +125,11 @@ export function totalOutstanding(items: Transaction[], customers: Customer[]) {
 
 /* ---------------- إنشاء العملاء تلقائيًا ---------------- */
 
-const AUTO_THRESHOLD = 2;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * إذا تكرر اسم في الديون غير المسلَّمة مرتين أو أكثر يُنشأ له حساب عميل
+ * يُنشأ حساب عميل تلقائيًا فقط عند وجود عمليتَي دين لنفس الاسم
+ * والفارق الزمني بين أقدم وأحدث عملية 24 ساعة على الأقل.
  * وتُربط جميع عملياته السابقة (دين/سداد) بنفس الحساب.
  */
 export function syncAutoCustomers(
@@ -110,7 +152,13 @@ export function syncAutoCustomers(
 
   for (const [key, group] of byKey) {
     const existing = nextCustomers.find((c) => normalizeName(c.name) === key);
-    if (!existing && group.length < AUTO_THRESHOLD) continue;
+    if (!existing) {
+      if (group.length < 2) continue;
+      const times = group.map((t) => new Date(t.date).getTime());
+      const span = Math.max(...times) - Math.min(...times);
+      if (span < DAY_MS) continue;
+    }
+
 
     let customer = existing;
     if (!customer) {
