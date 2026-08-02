@@ -55,7 +55,6 @@ import {
 } from "@/lib/storage";
 import { formatAmount, formatDate, formatTime } from "@/lib/format";
 import {
-  dailyDebts,
   matchesQuery,
   dailyDebtTotal,
   paymentTotalToday,
@@ -65,6 +64,7 @@ import {
 import { AppMenu } from "@/components/AppMenu";
 import { NameSuggest } from "@/components/NameSuggest";
 import { AddDialog } from "@/components/AddDialog";
+import { DailyDebtsTab } from "@/components/DailyDebtsTab";
 import { PaymentSection } from "@/components/PaymentSection";
 import { transcribeAudio } from "@/lib/transcribe.functions";
 import { isNativeApp, transcribeViaRemote } from "@/lib/transcribeRemote";
@@ -201,14 +201,10 @@ function App() {
           </TabsContent>
 
           <TabsContent value="debt" className="mt-4">
-            <LogTab
-              type="debt"
-              items={dailyDebts(items)}
+            <DailyDebtsTab
+              items={items}
               onUpdate={updateTx}
               onDelete={deleteTx}
-              onToggleDelivered={(t) =>
-                updateTx(t.id, { delivered: !t.delivered })
-              }
             />
           </TabsContent>
 
