@@ -67,47 +67,51 @@ function reportHtml(
 }
 
 async function htmlToPdfBlob(html: string) {
-  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-    import("html2canvas"),
-    import("jspdf"),
-  ]);
-  // إطار معزول حتى لا تتأثر عملية الرسم بأنماط التطبيق (oklch غير مدعومة)
-  const frame = document.createElement("iframe");
-  frame.style.cssText = "position:fixed;left:-10000px;top:0;width:900px;height:1400px;border:0";
-  document.body.appendChild(frame);
-  try {
-    const doc = frame.contentDocument!;
-    doc.open();
-    doc.write(
-      `<!doctype html><html dir="rtl"><head><meta charset="utf-8"></head><body style="margin:0;background:#fff">${html}</body></html>`,
-    );
-    doc.close();
-    await new Promise((r) => setTimeout(r, 60));
-    const target = doc.body.firstElementChild as HTMLElement;
-    const canvas = await html2canvas(target, {
-      scale: 2,
-      backgroundColor: "#ffffff",
-      windowWidth: 900,
-      windowHeight: target.scrollHeight + 40,
-    });
-    const pdf = new jsPDF({ unit: "pt", format: "a4" });
-    const w = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const h = (canvas.height * w) / canvas.width;
-    const img = canvas.toDataURL("image/jpeg", 0.92);
-    pdf.addImage(img, "JPEG", 0, 0, w, h);
-    let rest = h - pageH;
-    let offset = pageH;
-    while (rest > 0) {
-      pdf.addPage();
-      pdf.addImage(img, "JPEG", 0, -offset, w, h);
-      rest -= pageH;
-      offset += pageH;
-    }
-    return pdf.output("blob") as Blob;
-  } finally {
-    frame.remove();
+  const { jsPDF } = await import("jspdf");
+  // القياس أولًا داخل عنصر مخفي
+  const host = document.createElement("div");
+  host.style.cssText = "position:fixed;left:-10000px;top:0;width:794px;";
+  host.innerHTML = html;
+  document.body.appendChild(host);
+  const height = Math.ceil((host.firstElementChild as HTMLElement).scrollHeight) + 20;
+  host.remove();
+
+  // الرسم عبر SVG foreignObject (يتفادى قراءة أنماط التطبيق)
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="794" height="${height}">` +
+    `<foreignObject width="100%" height="100%">` +
+    `<div xmlns="http://www.w3.org/1999/xhtml">${html}</div>` +
+    `</foreignObject></svg>`;
+  const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  const img = new Image();
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error("render error"));
+    img.src = url;
+  });
+
+  const scale = 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = 794 * scale;
+  canvas.height = height * scale;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  const pdf = new jsPDF({ unit: "pt", format: "a4" });
+  const w = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+  const h = (canvas.height * w) / canvas.width;
+  const data = canvas.toDataURL("image/jpeg", 0.92);
+  pdf.addImage(data, "JPEG", 0, 0, w, h);
+  let offset = pageH;
+  while (h - offset > 0) {
+    pdf.addPage();
+    pdf.addImage(data, "JPEG", 0, -offset, w, h);
+    offset += pageH;
   }
+  return pdf.output("blob") as Blob;
 }
 
 function blobToBase64(blob: Blob) {
