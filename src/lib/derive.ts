@@ -125,10 +125,11 @@ export function totalOutstanding(items: Transaction[], customers: Customer[]) {
 
 /* ---------------- إنشاء العملاء تلقائيًا ---------------- */
 
-const AUTO_THRESHOLD = 2;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * إذا تكرر اسم في الديون غير المسلَّمة مرتين أو أكثر يُنشأ له حساب عميل
+ * يُنشأ حساب عميل تلقائيًا فقط عند وجود عمليتَي دين لنفس الاسم
+ * والفارق الزمني بين أقدم وأحدث عملية 24 ساعة على الأقل.
  * وتُربط جميع عملياته السابقة (دين/سداد) بنفس الحساب.
  */
 export function syncAutoCustomers(
@@ -151,7 +152,13 @@ export function syncAutoCustomers(
 
   for (const [key, group] of byKey) {
     const existing = nextCustomers.find((c) => normalizeName(c.name) === key);
-    if (!existing && group.length < AUTO_THRESHOLD) continue;
+    if (!existing) {
+      if (group.length < 2) continue;
+      const times = group.map((t) => new Date(t.date).getTime());
+      const span = Math.max(...times) - Math.min(...times);
+      if (span < DAY_MS) continue;
+    }
+
 
     let customer = existing;
     if (!customer) {
