@@ -64,6 +64,8 @@ import {
 import { AppMenu } from "@/components/AppMenu";
 import { NameSuggest } from "@/components/NameSuggest";
 import { AddDialog } from "@/components/AddDialog";
+import { LockScreen } from "@/components/LockScreen";
+import { isLockEnabled } from "@/lib/lock";
 import { DailyDebtsTab } from "@/components/DailyDebtsTab";
 import { PaymentSection } from "@/components/PaymentSection";
 import { transcribeAudio } from "@/lib/transcribe.functions";
@@ -89,6 +91,7 @@ function App() {
   const [tab, setTab] = useState("home");
   const [hydrated, setHydrated] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [locked, setLocked] = useState(false);
 
 
   const reload = () => {
@@ -103,6 +106,7 @@ function App() {
 
   useEffect(() => {
     reload();
+    setLocked(isLockEnabled());
     setHydrated(true);
     // بداية يوم جديد: إعادة الفحص عند العودة للتطبيق لتصفير اليوم السابق
     const onFocus = () => reload();
@@ -139,6 +143,11 @@ function App() {
   const deleteTx = (id: string) => {
     persist(items.filter((t) => t.id !== id));
   };
+  const updateCustomer = (id: string, patch: Partial<Customer>) => {
+    const next = customers.map((c) => (c.id === id ? { ...c, ...patch } : c));
+    saveCustomers(next);
+    setCustomers(next);
+  };
   const addCustomer = (c: Customer) => {
     const next = [...customers, c];
     saveCustomers(next);
@@ -147,6 +156,10 @@ function App() {
 
   if (!hydrated) {
     return <div className="min-h-screen bg-background" />;
+  }
+
+  if (locked) {
+    return <LockScreen onUnlock={() => setLocked(false)} />;
   }
 
   return (
@@ -160,7 +173,10 @@ function App() {
             profile={profile}
             onProfileChange={setProfile}
             onAddCustomer={addCustomer}
+            onUpdateCustomer={updateCustomer}
             onAddTx={addTx}
+            onUpdateTx={updateTx}
+            onDeleteTx={deleteTx}
             onReloaded={reload}
           />
           <div className="text-center">

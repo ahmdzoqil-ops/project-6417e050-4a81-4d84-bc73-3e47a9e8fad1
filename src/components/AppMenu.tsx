@@ -18,10 +18,12 @@ import {
   DatabaseBackup,
   Info,
   ArrowRight,
+  Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { CustomersSection } from "@/components/CustomersSection";
 import { HistorySection } from "@/components/HistorySection";
+import { LockSettings } from "@/components/LockSettings";
 import {
   createBackup,
   restoreBackup,
@@ -33,7 +35,14 @@ import {
 import { formatDate } from "@/lib/format";
 
 type NewTx = Omit<Transaction, "id" | "date">;
-type View = "menu" | "profile" | "customers" | "history" | "backup" | "about";
+type View =
+  | "menu"
+  | "profile"
+  | "customers"
+  | "history"
+  | "lock"
+  | "backup"
+  | "about";
 
 export function AppMenu({
   items,
@@ -41,7 +50,10 @@ export function AppMenu({
   profile,
   onProfileChange,
   onAddCustomer,
+  onUpdateCustomer,
   onAddTx,
+  onUpdateTx,
+  onDeleteTx,
   onReloaded,
 }: {
   items: Transaction[];
@@ -49,7 +61,10 @@ export function AppMenu({
   profile: Profile;
   onProfileChange: (p: Profile) => void;
   onAddCustomer: (c: Customer) => void;
+  onUpdateCustomer: (id: string, patch: Partial<Customer>) => void;
   onAddTx: (t: NewTx) => void;
+  onUpdateTx: (id: string, patch: Partial<Transaction>) => void;
+  onDeleteTx: (id: string) => void;
   onReloaded: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -60,6 +75,7 @@ export function AppMenu({
     profile: "معلومات المستخدم",
     customers: "العملاء والمديونيات",
     history: "السجل والتقارير",
+    lock: "قفل التطبيق",
     backup: "النسخ الاحتياطي",
     about: "معلومات التطبيق",
   };
@@ -98,6 +114,7 @@ export function AppMenu({
               <MenuItem icon={User} label="معلومات المستخدم" onClick={() => setView("profile")} />
               <MenuItem icon={Users} label="العملاء والمديونيات" onClick={() => setView("customers")} />
               <MenuItem icon={History} label="السجل والتقارير" onClick={() => setView("history")} />
+              <MenuItem icon={Lock} label="قفل التطبيق" onClick={() => setView("lock")} />
               <MenuItem icon={DatabaseBackup} label="النسخ الاحتياطي" onClick={() => setView("backup")} />
               <MenuItem icon={Info} label="معلومات التطبيق" onClick={() => setView("about")} />
             </ul>
@@ -111,14 +128,20 @@ export function AppMenu({
             <CustomersSection
               items={items}
               customers={customers}
+              profile={profile}
               onAddCustomer={onAddCustomer}
+              onUpdateCustomer={onUpdateCustomer}
               onAddTx={onAddTx}
+              onUpdateTx={onUpdateTx}
+              onDeleteTx={onDeleteTx}
             />
           )}
 
           {view === "history" && (
             <HistorySection items={items} />
           )}
+
+          {view === "lock" && <LockSettings />}
 
           {view === "backup" && <BackupPanel onReloaded={onReloaded} />}
 
