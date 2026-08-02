@@ -23,8 +23,12 @@ export type Customer = {
   id: string;
   name: string;
   phone?: string;
+  /** صورة العميل (dataURL) */
+  photo?: string;
+  note?: string;
   createdAt: string;
 };
+
 
 export type Profile = {
   photo?: string; // dataURL
