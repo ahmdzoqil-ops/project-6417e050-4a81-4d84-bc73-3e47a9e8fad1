@@ -123,6 +123,54 @@ function blobToBase64(blob: Blob) {
   });
 }
 
+async function deliver(blob: Blob, fileName: string) {
+  const { Capacitor } = await import("@capacitor/core");
+  if (Capacitor.isNativePlatform()) {
+    const [{ Filesystem, Directory }, { Share }] = await Promise.all([
+      import("@capacitor/filesystem"),
+      import("@capacitor/share"),
+    ]);
+    const data = await blobToBase64(blob);
+    const res = await Filesystem.writeFile({
+      path: fileName,
+      data,
+      directory: Directory.Cache,
+    });
+    await Share.share({ title: fileName, url: res.uri });
+    return;
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+
+/** توليد PDF من HTML جاهز ثم مشاركته أو تنزيله */
+export async function shareHtmlReport(html: string, fileName: string) {
+  await deliver(await htmlToPdfBlob(html), fileName);
+}
+
+/** غلاف موحّد لرأس/ذيل التقارير */
+export function reportShell(title: string, profile: Profile, inner: string) {
+  const logo = profile.photo
+    ? `<img src="${profile.photo}" style="width:70px;height:70px;border-radius:50%;object-fit:cover;margin:0 auto 8px;display:block" />`
+    : "";
+  return `<div style="width:794px;padding:32px;background:#fff;color:#111;font-family:'Segoe UI',Tahoma,Arial,sans-serif;direction:rtl">
+    <div style="text-align:center;border-bottom:2px solid #e11d48;padding-bottom:12px">
+      ${logo}
+      <div style="font-size:24px;font-weight:800">${esc(profile.shopName ?? "دينك بصوتك")}</div>
+      <div style="font-size:13px;color:#666">${esc(profile.userName ?? "")} ${profile.phone ? "— " + esc(profile.phone) : ""}</div>
+      <div style="margin-top:8px;font-size:18px;font-weight:700">${esc(title)}</div>
+    </div>
+    ${inner}
+    <div style="margin-top:28px;border-top:1px solid #ddd;padding-top:10px;text-align:center;font-size:12px;color:#777">
+      تم إنشاء هذا التقرير بواسطة تطبيق «دينك بصوتك» — إدارة الديون والجيب محليًا على الجهاز
+    </div>
+  </div>`;
+}
+
 /** إنشاء تقرير PDF لعميل ثم مشاركته أو تنزيله */
 export async function shareCustomerReport(
   customer: Customer,
@@ -134,6 +182,10 @@ export async function shareCustomerReport(
     .sort((a, z) => a.date.localeCompare(z.date));
   const balance = customerBalance(items, customer.id);
   const blob = await htmlToPdfBlob(reportHtml(customer, rows, balance, profile));
+  const fileName = `تقرير-${customer.name.replace(/\s+/g, "-")}.pdf`;
+  await deliver(blob, fileName);
+}
+
   const fileName = `تقرير-${customer.name.replace(/\s+/g, "-")}.pdf`;
 
   const { Capacitor } = await import("@capacitor/core");
