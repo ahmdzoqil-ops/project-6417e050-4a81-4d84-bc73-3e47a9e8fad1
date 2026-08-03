@@ -19,11 +19,13 @@ import {
   Info,
   ArrowRight,
   Lock,
+  Boxes,
 } from "lucide-react";
 import { toast } from "sonner";
 import { CustomersSection } from "@/components/CustomersSection";
 import { HistorySection } from "@/components/HistorySection";
 import { LockSettings } from "@/components/LockSettings";
+import { ExpensesSection } from "@/components/ExpensesSection";
 import {
   createBackup,
   restoreBackup,
@@ -40,6 +42,7 @@ type View =
   | "profile"
   | "customers"
   | "history"
+  | "expenses"
   | "lock"
   | "backup"
   | "about";
@@ -75,6 +78,7 @@ export function AppMenu({
     profile: "معلومات المستخدم",
     customers: "العملاء والمديونيات",
     history: "السجل والتقارير",
+    expenses: "الضمار والمصاريف",
     lock: "قفل التطبيق",
     backup: "النسخ الاحتياطي",
     about: "معلومات التطبيق",
@@ -114,6 +118,7 @@ export function AppMenu({
               <MenuItem icon={User} label="معلومات المستخدم" onClick={() => setView("profile")} />
               <MenuItem icon={Users} label="العملاء والمديونيات" onClick={() => setView("customers")} />
               <MenuItem icon={History} label="السجل والتقارير" onClick={() => setView("history")} />
+              <MenuItem icon={Boxes} label="الضمار والمصاريف" onClick={() => setView("expenses")} />
               <MenuItem icon={Lock} label="قفل التطبيق" onClick={() => setView("lock")} />
               <MenuItem icon={DatabaseBackup} label="النسخ الاحتياطي" onClick={() => setView("backup")} />
               <MenuItem icon={Info} label="معلومات التطبيق" onClick={() => setView("about")} />
@@ -139,6 +144,10 @@ export function AppMenu({
 
           {view === "history" && (
             <HistorySection items={items} />
+          )}
+
+          {view === "expenses" && (
+            <ExpensesSection items={items} profile={profile} />
           )}
 
           {view === "lock" && <LockSettings />}
