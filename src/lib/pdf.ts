@@ -185,29 +185,3 @@ export async function shareCustomerReport(
   const fileName = `تقرير-${customer.name.replace(/\s+/g, "-")}.pdf`;
   await deliver(blob, fileName);
 }
-
-  const fileName = `تقرير-${customer.name.replace(/\s+/g, "-")}.pdf`;
-
-  const { Capacitor } = await import("@capacitor/core");
-  if (Capacitor.isNativePlatform()) {
-    const [{ Filesystem, Directory }, { Share }] = await Promise.all([
-      import("@capacitor/filesystem"),
-      import("@capacitor/share"),
-    ]);
-    const data = await blobToBase64(blob);
-    const res = await Filesystem.writeFile({
-      path: fileName,
-      data,
-      directory: Directory.Cache,
-    });
-    await Share.share({ title: fileName, url: res.uri });
-    return;
-  }
-
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = fileName;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 3000);
-}
