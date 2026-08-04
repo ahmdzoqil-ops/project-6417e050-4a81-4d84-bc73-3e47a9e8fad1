@@ -148,3 +148,24 @@ export function daySummary(
     costs: distributeExpenses(purchases, expensesTotal),
   };
 }
+
+/** الاحتفاظ ببيانات الضمار والمصاريف لمدة 7 أيام فقط */
+const KEEP_DAYS = 7;
+
+export function pruneQat(d: QatData): QatData {
+  const limit = Date.now() - KEEP_DAYS * 24 * 60 * 60 * 1000;
+  const keep = <T extends { date: string }>(rows: T[]) =>
+    rows.filter((r) => new Date(r.date).getTime() >= limit);
+  return {
+    purchases: keep(d.purchases),
+    expenses: keep(d.expenses),
+    cashSales: keep(d.cashSales),
+  };
+}
+
+/** تحميل مع تنظيف تلقائي */
+export function loadQatPruned(): QatData {
+  const pruned = pruneQat(loadQat());
+  saveQat(pruned);
+  return pruned;
+}

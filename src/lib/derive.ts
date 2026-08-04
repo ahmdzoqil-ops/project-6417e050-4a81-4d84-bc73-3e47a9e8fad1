@@ -31,9 +31,14 @@ export function matchesQuery(text: string, query: string) {
 
 /* ---------------- اشتقاقات موحّدة ---------------- */
 
-/** كل ديون اليوم (سواء كانت مرتبطة بعميل أو لا) */
+/**
+ * كل ديون اليوم — باستثناء العمليات المُنشأة من قسم المديونية (ledgerOnly)
+ * فاتجاه المزامنة: اليومية ← المديونية فقط.
+ */
 export function dailyDebts(items: Transaction[]) {
-  return items.filter((t) => t.type === "debt" && isToday(t.date));
+  return items.filter(
+    (t) => t.type === "debt" && !t.ledgerOnly && isToday(t.date),
+  );
 }
 
 /** إجمالي دين اليوم بعد استبعاد ما تم تسليمه */
@@ -42,6 +47,7 @@ export function dailyDebtTotal(items: Transaction[]) {
     .filter((t) => !t.delivered)
     .reduce((s, t) => s + t.amount, 0);
 }
+
 
 export type DebtGroup = {
   key: string;
@@ -95,6 +101,14 @@ export function paymentTotalToday(items: Transaction[]) {
     .filter((t) => t.type === "payment" && isToday(t.date))
     .reduce((s, t) => s + t.amount, 0);
 }
+
+/** إجمالي السحب النقدي لليوم */
+export function withdrawTotalToday(items: Transaction[]) {
+  return items
+    .filter((t) => t.type === "withdraw" && isToday(t.date))
+    .reduce((s, t) => s + t.amount, 0);
+}
+
 
 export type DebtorRow = {
   customer: Customer;

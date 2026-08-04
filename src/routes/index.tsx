@@ -14,7 +14,9 @@ import {
   Loader2,
   Banknote,
   CheckCircle2,
+  ArrowDownToLine,
 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -53,14 +55,18 @@ import {
   type Transaction,
   type TxType,
 } from "@/lib/storage";
-import { formatAmount, formatDate, formatTime } from "@/lib/format";
+import { formatAmount, formatDate, formatTime, txLabel } from "@/lib/format";
 import {
   matchesQuery,
   dailyDebtTotal,
   paymentTotalToday,
   pocketTotal,
+  withdrawTotalToday,
   syncAutoCustomers,
 } from "@/lib/derive";
+import { runReminders } from "@/lib/notify";
+import { ReportViewer } from "@/components/ReportViewer";
+
 import { AppMenu } from "@/components/AppMenu";
 import { NameSuggest } from "@/components/NameSuggest";
 import { AddDialog } from "@/components/AddDialog";
@@ -68,6 +74,8 @@ import { LockScreen } from "@/components/LockScreen";
 import { isLockEnabled } from "@/lib/lock";
 import { DailyDebtsTab } from "@/components/DailyDebtsTab";
 import { PaymentSection } from "@/components/PaymentSection";
+import { WithdrawSection } from "@/components/WithdrawSection";
+
 import { transcribeAudio } from "@/lib/transcribe.functions";
 import { isNativeApp, transcribeViaRemote } from "@/lib/transcribeRemote";
 import {
@@ -130,9 +138,19 @@ function App() {
       debt: dailyDebtTotal(items),
       pocket: pocketTotal(items),
       payment: paymentTotalToday(items),
+      withdraw: withdrawTotalToday(items),
     }),
     [items],
   );
+
+  useEffect(() => {
+    if (!hydrated || locked || !items.length) return;
+    const id = window.setTimeout(() => {
+      void runReminders(items, customers);
+    }, 1500);
+    return () => window.clearTimeout(id);
+  }, [hydrated, locked, items, customers]);
+
 
   const addTx = (t: NewTx) => {
     persist([{ ...t, id: newId(), date: new Date().toISOString() }, ...items]);
@@ -189,18 +207,36 @@ function App() {
         </header>
 
         <Tabs value={tab} onValueChange={setTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="home" className="gap-1 px-1 text-[11px]">
+          <TabsList className="grid w-full grid-cols-5 gap-0.5">
+            <TabsTrigger
+              value="home"
+              className="flex-col gap-0.5 px-0.5 py-1.5 text-[10px]"
+            >
               <Home className="h-4 w-4" /> الرئيسية
             </TabsTrigger>
-            <TabsTrigger value="debt" className="gap-1 px-1 text-[11px]">
+            <TabsTrigger
+              value="debt"
+              className="flex-col gap-0.5 px-0.5 py-1.5 text-[10px]"
+            >
               <HandCoins className="h-4 w-4" /> الديون
             </TabsTrigger>
-            <TabsTrigger value="pocket" className="gap-1 px-1 text-[11px]">
+            <TabsTrigger
+              value="pocket"
+              className="flex-col gap-0.5 px-0.5 py-1.5 text-[10px]"
+            >
               <Wallet className="h-4 w-4" /> الجيب
             </TabsTrigger>
-            <TabsTrigger value="payment" className="gap-1 px-1 text-[11px]">
+            <TabsTrigger
+              value="payment"
+              className="flex-col gap-0.5 px-0.5 py-1.5 text-[10px]"
+            >
               <Banknote className="h-4 w-4" /> السداد
+            </TabsTrigger>
+            <TabsTrigger
+              value="withdraw"
+              className="flex-col gap-0.5 px-0.5 py-1.5 text-[10px]"
+            >
+              <ArrowDownToLine className="h-4 w-4" /> السحب
             </TabsTrigger>
           </TabsList>
 
@@ -240,7 +276,17 @@ function App() {
               onDelete={deleteTx}
             />
           </TabsContent>
+
+          <TabsContent value="withdraw" className="mt-4">
+            <WithdrawSection
+              items={items}
+              onAdd={addTx}
+              onUpdate={updateTx}
+              onDelete={deleteTx}
+            />
+          </TabsContent>
         </Tabs>
+
       </div>
 
       <button
@@ -251,6 +297,8 @@ function App() {
       >
         <Plus className="h-8 w-8" />
       </button>
+
+      <ReportViewer />
 
       <AddDialog
         open={adding}
@@ -271,7 +319,12 @@ function HomeTab({
 }: {
   items: Transaction[];
   customers: Customer[];
-  totals: { debt: number; pocket: number; payment: number };
+  totals: {
+    debt: number;
+    pocket: number;
+    payment: number;
+    withdraw: number;
+  };
   onAdd: (t: NewTx) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -291,11 +344,17 @@ function HomeTab({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <TotalCard label="دين اليوم" amount={totals.debt} tone="debt" />
         <TotalCard label="الجيب" amount={totals.pocket} tone="pocket" />
         <TotalCard label="سداد اليوم" amount={totals.payment} tone="payment" />
+        <TotalCard
+          label="السحب النقدي"
+          amount={totals.withdraw}
+          tone="withdraw"
+        />
       </div>
+
 
       <VoicePanel customers={customers} items={items} onAdd={onAdd} />
 
@@ -323,8 +382,8 @@ function HomeTab({
           </ul>
         )}
         <p className="mt-2 text-center text-[11px] text-muted-foreground">
-          يبدأ يوم جديد تلقائيًا: يُصفَّر الجيب والدين اليومي والسداد اليومي —
-          والسجل الكامل داخل القائمة العلوية.
+          يبدأ اليوم الجديد عند الساعة 03:00 فجرًا — تبقى بيانات اليوم ظاهرة
+          حتى ذلك الوقت ثم تنتقل تلقائيًا إلى السجل والتقارير.
         </p>
       </section>
     </div>
@@ -353,7 +412,14 @@ const TONES: Record<
     value: "text-sky-800 dark:text-sky-200",
     dot: "bg-sky-500",
   },
+  withdraw: {
+    card: "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/30",
+    label: "text-amber-700 dark:text-amber-300",
+    value: "text-amber-800 dark:text-amber-200",
+    dot: "bg-amber-500",
+  },
 };
+
 
 function TotalCard({
   label,
@@ -394,11 +460,8 @@ function TxRow({
         </div>
         <span className="mt-0.5 text-[11px] text-muted-foreground">
           {isToday(tx.date) ? formatTime(tx.date) : formatDate(tx.date)}
-          {tx.type === "debt"
-            ? " • دين"
-            : tx.type === "pocket"
-              ? " • جيب"
-              : " • سداد"}
+          {" • " + (txLabel[tx.type] ?? "")}
+
           {tx.note ? ` • ${tx.note}` : ""}
         </span>
       </div>

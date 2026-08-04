@@ -1,4 +1,4 @@
-export type TxType = "debt" | "pocket" | "payment";
+export type TxType = "debt" | "pocket" | "payment" | "withdraw";
 
 export type Transaction = {
   id: string;
@@ -17,6 +17,13 @@ export type Transaction = {
   linkedTxId?: string;
   /** صور مرفقة (dataURL) */
   images?: string[];
+  /**
+   * عملية أُنشئت من قسم المديونية — تُسجّل في كشف العميل فقط
+   * ولا تظهر ضمن الديون اليومية.
+   */
+  ledgerOnly?: boolean;
+  /** سبب السحب النقدي */
+  reason?: string;
 };
 
 export type Customer = {
@@ -27,6 +34,10 @@ export type Customer = {
   photo?: string;
   note?: string;
   createdAt: string;
+  /** كتم إشعارات هذا العميل */
+  notifyMuted?: boolean;
+  /** عدد أيام مخصص لهذا العميل (يتجاوز الإعداد العام) */
+  notifyDays?: number;
 };
 
 
@@ -41,6 +52,7 @@ export type Profile = {
 const KEY = "dainak-bisawtak.transactions.v1";
 const CUSTOMERS_KEY = "dainak-bisawtak.customers.v1";
 const PROFILE_KEY = "dainak-bisawtak.profile.v1";
+
 
 const DAY = 24 * 60 * 60 * 1000;
 const SIX_MONTHS = 182 * DAY;
@@ -75,22 +87,33 @@ export function saveAll(list: Transaction[]) {
   write(KEY, list);
 }
 
+/**
+ * دورة اليوم: لا يبدأ اليوم الجديد عند منتصف الليل بل عند الساعة 03:00 فجرًا
+ * حسب توقيت الجهاز، حتى يمكن مراجعة عمليات الدوام بعد منتصف الليل.
+ */
+export const DAY_CUTOFF_HOUR = 3;
+
+/** بداية «يوم العمل» الحالي (أو الذي يقع فيه التاريخ المُمرَّر) */
 export function startOfDay(d: Date | string = new Date()) {
   const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
+  if (x.getHours() < DAY_CUTOFF_HOUR) x.setDate(x.getDate() - 1);
+  x.setHours(DAY_CUTOFF_HOUR, 0, 0, 0);
   return x;
 }
 
+/** هل ينتمي التاريخ إلى يوم العمل الحالي؟ */
 export function isToday(iso: string) {
   return new Date(iso).getTime() >= startOfDay().getTime();
 }
 
+/** مفتاح يوم العمل (يأخذ في الحسبان قطع الساعة 03:00) */
 export function dayKey(iso: string) {
-  const d = new Date(iso);
+  const d = startOfDay(iso);
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${d.getFullYear()}-${m}-${day}`;
 }
+
 
 /**
  * نظام بداية اليوم الجديد:
