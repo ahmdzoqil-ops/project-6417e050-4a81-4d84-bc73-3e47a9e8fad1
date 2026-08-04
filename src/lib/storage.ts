@@ -1,4 +1,4 @@
-export type TxType = "debt" | "pocket" | "payment";
+export type TxType = "debt" | "pocket" | "payment" | "withdraw";
 
 export type Transaction = {
   id: string;
@@ -17,6 +17,13 @@ export type Transaction = {
   linkedTxId?: string;
   /** صور مرفقة (dataURL) */
   images?: string[];
+  /**
+   * عملية أُنشئت من قسم المديونية — تُسجّل في كشف العميل فقط
+   * ولا تظهر ضمن الديون اليومية.
+   */
+  ledgerOnly?: boolean;
+  /** سبب السحب النقدي */
+  reason?: string;
 };
 
 export type Customer = {
@@ -27,6 +34,10 @@ export type Customer = {
   photo?: string;
   note?: string;
   createdAt: string;
+  /** كتم إشعارات هذا العميل */
+  notifyMuted?: boolean;
+  /** عدد أيام مخصص لهذا العميل (يتجاوز الإعداد العام) */
+  notifyDays?: number;
 };
 
 
@@ -41,6 +52,7 @@ export type Profile = {
 const KEY = "dainak-bisawtak.transactions.v1";
 const CUSTOMERS_KEY = "dainak-bisawtak.customers.v1";
 const PROFILE_KEY = "dainak-bisawtak.profile.v1";
+
 
 const DAY = 24 * 60 * 60 * 1000;
 const SIX_MONTHS = 182 * DAY;
