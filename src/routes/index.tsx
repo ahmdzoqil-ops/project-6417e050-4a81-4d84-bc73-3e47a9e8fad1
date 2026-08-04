@@ -458,11 +458,8 @@ function TxRow({
         </div>
         <span className="mt-0.5 text-[11px] text-muted-foreground">
           {isToday(tx.date) ? formatTime(tx.date) : formatDate(tx.date)}
-          {tx.type === "debt"
-            ? " • دين"
-            : tx.type === "pocket"
-              ? " • جيب"
-              : " • سداد"}
+          {" • " + (txLabel[tx.type] ?? "")}
+
           {tx.note ? ` • ${tx.note}` : ""}
         </span>
       </div>
