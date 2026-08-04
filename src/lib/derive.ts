@@ -102,6 +102,14 @@ export function paymentTotalToday(items: Transaction[]) {
     .reduce((s, t) => s + t.amount, 0);
 }
 
+/** إجمالي السحب النقدي لليوم */
+export function withdrawTotalToday(items: Transaction[]) {
+  return items
+    .filter((t) => t.type === "withdraw" && isToday(t.date))
+    .reduce((s, t) => s + t.amount, 0);
+}
+
+
 export type DebtorRow = {
   customer: Customer;
   balance: number;
