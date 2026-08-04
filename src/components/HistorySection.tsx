@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { ArrowRight } from "lucide-react";
 import { formatAmount, formatDate, formatDayLabel, formatTime, txLabel } from "@/lib/format";
 import { dayKey, historyItems, type Transaction, type TxType } from "@/lib/storage";
 import { matchesQuery } from "@/lib/derive";
@@ -163,6 +164,19 @@ function TxRow({
   );
 }
 
+
+function BackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="absolute left-4 top-4 flex items-center gap-1 rounded-full px-2 py-1 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground"
+    >
+      <ArrowRight className="h-4 w-4" /> رجوع
+    </button>
+  );
+}
+
 function TxActionsSheet({
   open,
   onOpenChange,
@@ -191,7 +205,8 @@ function TxActionsSheet({
           if (!v) close();
         }}
       >
-        <DialogContent className="max-w-xs rounded-2xl">
+        <DialogContent className="max-w-xs rounded-2xl [&>button]:hidden">
+          <BackButton onClick={close} />
           <DialogHeader>
             <DialogTitle className="text-base">{t.name}</DialogTitle>
           </DialogHeader>
@@ -287,7 +302,8 @@ function EditTxDialog({
         onOpenChange(v);
       }}
     >
-      <DialogContent className="max-w-sm rounded-2xl">
+      <DialogContent className="max-w-sm rounded-2xl [&>button]:hidden">
+        <BackButton onClick={() => onOpenChange(false)} />
         <DialogHeader>
           <DialogTitle>تعديل العملية</DialogTitle>
         </DialogHeader>
