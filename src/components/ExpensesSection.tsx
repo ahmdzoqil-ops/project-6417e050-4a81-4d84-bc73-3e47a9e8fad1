@@ -4,13 +4,38 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Plus, Trash2, Pencil, FileText, Package, Receipt, Coins } from "lucide-react";
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { cn } from "@/lib/utils";
+import {
+  Plus,
+  Trash2,
+  Pencil,
+  FileText,
+  Package,
+  Receipt,
+  Coins,
+  Wallet,
+  Layers,
+  StickyNote,
+  Truck,
+  BadgePercent,
+  Sparkles,
+} from "lucide-react";
 import { toast } from "sonner";
 import { formatAmount } from "@/lib/format";
 import { dayKey, startOfDay, type Profile, type Transaction } from "@/lib/storage";
@@ -19,7 +44,7 @@ import { reportShell, shareHtmlReport } from "@/lib/pdf";
 import {
   daySummary,
   expenseLabel,
-  loadQat,
+  loadQatPruned,
   newQatId,
   ofDay,
   saveQat,
@@ -37,7 +62,7 @@ export function ExpensesSection({
   items: Transaction[];
   profile: Profile;
 }) {
-  const [data, setData] = useState<QatData>(() => loadQat());
+  const [data, setData] = useState<QatData>(() => loadQatPruned());
   const today = dayKey(startOfDay().toISOString());
 
   const update = (next: QatData) => {
@@ -55,6 +80,15 @@ export function ExpensesSection({
   const purchases = ofDay(data.purchases, today);
   const expenses = ofDay(data.expenses, today);
   const cashSales = ofDay(data.cashSales, today);
+
+  const [purchaseDialog, setPurchaseDialog] = useState<Purchase | null | "new">(null);
+  const [expenseDialog, setExpenseDialog] = useState<Expense | null | "new">(null);
+  const [cashDialog, setCashDialog] = useState<CashSale | null | "new">(null);
+  const [confirmDelete, setConfirmDelete] = useState<{
+    kind: "purchases" | "expenses" | "cashSales";
+    id: string;
+    label: string;
+  } | null>(null);
 
   const exportPdf = async () => {
     try {
@@ -102,28 +136,32 @@ export function ExpensesSection({
     }
   };
 
+  const realPerBundleAvg = useMemo(() => {
+    const totalBundles = summary.costs.reduce((s, c) => s + c.purchase.bundles, 0);
+    if (totalBundles <= 0) return 0;
+    return summary.costs.reduce((s, c) => s + c.realPerBundle * c.purchase.bundles, 0) / totalBundles;
+  }, [summary.costs]);
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-2">
-        <Stat label="رأس المال" value={summary.capital} tone="text-amber-600" />
-        <Stat label="إجمالي البيع" value={summary.salesTotal} tone="text-emerald-600" />
-        <Stat label="المصاريف" value={summary.expensesTotal} tone="text-rose-600" />
-        <Stat
+        <StatCard label="رأس المال" value={summary.capital} tone="amber" icon={Wallet} />
+        <StatCard label="إجمالي المبيعات" value={summary.salesTotal} tone="emerald" icon={Coins} />
+        <StatCard
           label={summary.profit >= 0 ? "الربح" : "الخسارة"}
           value={Math.abs(summary.profit)}
-          tone={summary.profit >= 0 ? "text-emerald-600" : "text-rose-600"}
+          tone={summary.profit >= 0 ? "emerald" : "rose"}
+          icon={Sparkles}
         />
+        <StatCard label="السعر الحقيقي للعلاقة" value={Math.round(realPerBundleAvg)} tone="sky" icon={Layers} />
       </div>
 
-      <Button className="w-full gap-2" variant="outline" onClick={exportPdf}>
+      <Button className="w-full gap-2 rounded-2xl" variant="outline" onClick={exportPdf}>
         <FileText className="h-4 w-4" /> مشاركة تقرير اليوم (PDF)
       </Button>
 
       {/* الشروات */}
-      <Block icon={Package} title="الشروات (المشتريات)">
-        <PurchaseForm
-          onAdd={(p) => update({ ...data, purchases: [p, ...data.purchases] })}
-        />
+      <Block icon={Package} title="الشروات (المشتريات)" onAdd={() => setPurchaseDialog("new")} addLabel="إضافة شروة">
         {summary.costs.length === 0 && <Empty text="لا توجد شروات اليوم" />}
         {summary.costs.map((c) => (
           <Row
@@ -131,30 +169,16 @@ export function ExpensesSection({
             title={c.purchase.kind}
             subtitle={`${c.purchase.bundles} علاقة · السعر الحقيقي ${formatAmount(Math.round(c.realPerBundle))}${c.purchase.note ? " · " + c.purchase.note : ""}`}
             amount={c.purchase.amount}
-            onEdit={() => {
-              const amount = Number(prompt("مبلغ الشراء", String(c.purchase.amount)));
-              const bundles = Number(prompt("عدد العلاقي", String(c.purchase.bundles)));
-              if (!amount || !bundles) return;
-              update({
-                ...data,
-                purchases: data.purchases.map((p) =>
-                  p.id === c.purchase.id ? { ...p, amount, bundles } : p,
-                ),
-              });
-            }}
+            onEdit={() => setPurchaseDialog(c.purchase)}
             onDelete={() =>
-              update({
-                ...data,
-                purchases: data.purchases.filter((p) => p.id !== c.purchase.id),
-              })
+              setConfirmDelete({ kind: "purchases", id: c.purchase.id, label: c.purchase.kind })
             }
           />
         ))}
       </Block>
 
       {/* المصاريف */}
-      <Block icon={Receipt} title="المصاريف">
-        <ExpenseForm onAdd={(e) => update({ ...data, expenses: [e, ...data.expenses] })} />
+      <Block icon={Receipt} title="المصاريف" onAdd={() => setExpenseDialog("new")} addLabel="إضافة مصروف">
         {expenses.length === 0 && <Empty text="لا توجد مصاريف اليوم" />}
         {expenses.map((e) => (
           <Row
@@ -162,44 +186,28 @@ export function ExpensesSection({
             title={expenseLabel[e.kind]}
             subtitle={e.note ?? ""}
             amount={e.amount}
-            onEdit={() => {
-              const amount = Number(prompt("المبلغ", String(e.amount)));
-              if (!amount) return;
-              update({
-                ...data,
-                expenses: data.expenses.map((x) => (x.id === e.id ? { ...x, amount } : x)),
-              });
-            }}
+            onEdit={() => setExpenseDialog(e)}
             onDelete={() =>
-              update({ ...data, expenses: data.expenses.filter((x) => x.id !== e.id) })
+              setConfirmDelete({ kind: "expenses", id: e.id, label: expenseLabel[e.kind] })
             }
           />
         ))}
       </Block>
 
       {/* حركة البيع */}
-      <Block icon={Coins} title="حركة البيع">
-        <CashForm onAdd={(c) => update({ ...data, cashSales: [c, ...data.cashSales] })} />
+      <Block icon={Coins} title="حركة البيع" onAdd={() => setCashDialog("new")} addLabel="إضافة بيع نقدي">
+        {cashSales.length === 0 && <Empty text="لا توجد مبيعات نقدية اليوم" />}
         {cashSales.map((c) => (
           <Row
             key={c.id}
             title="بيع نقدي"
             subtitle={c.note ?? ""}
             amount={c.amount}
-            onEdit={() => {
-              const amount = Number(prompt("المبلغ", String(c.amount)));
-              if (!amount) return;
-              update({
-                ...data,
-                cashSales: data.cashSales.map((x) => (x.id === c.id ? { ...x, amount } : x)),
-              });
-            }}
-            onDelete={() =>
-              update({ ...data, cashSales: data.cashSales.filter((x) => x.id !== c.id) })
-            }
+            onEdit={() => setCashDialog(c)}
+            onDelete={() => setConfirmDelete({ kind: "cashSales", id: c.id, label: "بيع نقدي" })}
           />
         ))}
-        <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+        <div className="rounded-2xl border bg-muted/40 p-3 text-sm">
           <p className="flex justify-between"><span>بيع دين (تلقائي)</span><span className="font-bold tabular-nums">{formatAmount(summary.debtSales)}</span></p>
           <p className="flex justify-between"><span>جيب (تلقائي)</span><span className="font-bold tabular-nums">{formatAmount(summary.pocketSales)}</span></p>
           <p className="mt-1 flex justify-between border-t pt-1"><span>الإجمالي</span><span className="font-bold tabular-nums">{formatAmount(summary.salesTotal)}</span></p>
@@ -207,18 +215,114 @@ export function ExpensesSection({
       </Block>
 
       <p className="text-center text-[11px] text-muted-foreground">
-        عدد الشروات المسجلة اليوم: {purchases.length}
+        عدد الشروات المسجلة اليوم: {purchases.length} · تُحفظ تقارير الضمار والمصاريف لمدة 7 أيام
       </p>
+
+      {/* حوارات الإضافة/التعديل */}
+      <PurchaseDialog
+        value={purchaseDialog}
+        onClose={() => setPurchaseDialog(null)}
+        onSave={(p) => {
+          const exists = data.purchases.some((x) => x.id === p.id);
+          update({
+            ...data,
+            purchases: exists
+              ? data.purchases.map((x) => (x.id === p.id ? p : x))
+              : [p, ...data.purchases],
+          });
+          toast.success(exists ? "تم حفظ التعديل" : "تمت إضافة الشروة");
+          setPurchaseDialog(null);
+        }}
+      />
+
+      <ExpenseDialog
+        value={expenseDialog}
+        onClose={() => setExpenseDialog(null)}
+        onSave={(e) => {
+          const exists = data.expenses.some((x) => x.id === e.id);
+          update({
+            ...data,
+            expenses: exists
+              ? data.expenses.map((x) => (x.id === e.id ? e : x))
+              : [e, ...data.expenses],
+          });
+          toast.success(exists ? "تم حفظ التعديل" : "تمت إضافة المصروف");
+          setExpenseDialog(null);
+        }}
+      />
+
+      <CashDialog
+        value={cashDialog}
+        onClose={() => setCashDialog(null)}
+        onSave={(c) => {
+          const exists = data.cashSales.some((x) => x.id === c.id);
+          update({
+            ...data,
+            cashSales: exists
+              ? data.cashSales.map((x) => (x.id === c.id ? c : x))
+              : [c, ...data.cashSales],
+          });
+          toast.success(exists ? "تم حفظ التعديل" : "تمت إضافة البيع النقدي");
+          setCashDialog(null);
+        }}
+      />
+
+      <AlertDialog open={!!confirmDelete} onOpenChange={(v) => !v && setConfirmDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف «{confirmDelete?.label}»؟</AlertDialogTitle>
+            <AlertDialogDescription>لا يمكن التراجع عن هذا الإجراء.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (!confirmDelete) return;
+                const { kind, id } = confirmDelete;
+                update({
+                  ...data,
+                  [kind]: (data[kind] as { id: string }[]).filter((x) => x.id !== id),
+                } as QatData);
+                toast.success("تم الحذف");
+                setConfirmDelete(null);
+              }}
+            >
+              حذف
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: number; tone: string }) {
+/* ---------------- بطاقات إحصائية ---------------- */
+
+const TONE_CLASSES: Record<string, string> = {
+  amber: "bg-amber-50 text-amber-700 border-amber-200",
+  emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  rose: "bg-rose-50 text-rose-700 border-rose-200",
+  sky: "bg-sky-50 text-sky-700 border-sky-200",
+};
+
+function StatCard({
+  label,
+  value,
+  tone,
+  icon: Icon,
+}: {
+  label: string;
+  value: number;
+  tone: "amber" | "emerald" | "rose" | "sky";
+  icon: React.ComponentType<{ className?: string }>;
+}) {
   return (
-    <Card>
-      <CardContent className="py-3 text-center">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className={`text-lg font-bold tabular-nums ${tone}`}>{formatAmount(value)}</p>
+    <Card className={cn("rounded-2xl border", TONE_CLASSES[tone])}>
+      <CardContent className="flex flex-col items-center gap-1 py-4 text-center">
+        <Icon className="h-4 w-4 opacity-70" />
+        <p className="text-xs opacity-80">{label}</p>
+        <p className="text-lg font-bold tabular-nums">{formatAmount(value)}</p>
       </CardContent>
     </Card>
   );
@@ -228,17 +332,26 @@ function Block({
   icon: Icon,
   title,
   children,
+  onAdd,
+  addLabel,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   children: React.ReactNode;
+  onAdd: () => void;
+  addLabel: string;
 }) {
   return (
-    <div className="space-y-2 rounded-xl border p-3">
-      <p className="flex items-center gap-2 font-semibold">
-        <Icon className="h-4 w-4 text-muted-foreground" /> {title}
-      </p>
-      {children}
+    <div className="space-y-2 rounded-2xl border p-3">
+      <div className="flex items-center justify-between">
+        <p className="flex items-center gap-2 font-semibold">
+          <Icon className="h-4 w-4 text-muted-foreground" /> {title}
+        </p>
+        <Button size="sm" className="gap-1 rounded-full" onClick={onAdd}>
+          <Plus className="h-4 w-4" /> {addLabel}
+        </Button>
+      </div>
+      <div className="space-y-2">{children}</div>
     </div>
   );
 }
@@ -261,7 +374,7 @@ function Row({
   onDelete: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border p-2">
+    <div className="flex items-center gap-2 rounded-2xl border bg-card p-2 shadow-sm">
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{title}</p>
         {subtitle ? (
@@ -279,171 +392,295 @@ function Row({
   );
 }
 
-function PurchaseForm({ onAdd }: { onAdd: (p: Purchase) => void }) {
+/* ---------------- حقل بأيقونة ---------------- */
+
+function IconField({
+  icon: Icon,
+  label,
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1">
+      <Label className="flex items-center gap-1 text-xs text-muted-foreground">
+        <Icon className="h-3.5 w-3.5" /> {label}
+      </Label>
+      {children}
+    </div>
+  );
+}
+
+/* ---------------- حوار الشروة ---------------- */
+
+function PurchaseDialog({
+  value,
+  onClose,
+  onSave,
+}: {
+  value: Purchase | null | "new";
+  onClose: () => void;
+  onSave: (p: Purchase) => void;
+}) {
+  const open = value !== null;
+  const editing = value && value !== "new" ? value : null;
   const [kind, setKind] = useState("");
   const [amount, setAmount] = useState("");
   const [bundles, setBundles] = useState("");
   const [note, setNote] = useState("");
 
+  useMemo(() => {
+    if (editing) {
+      setKind(editing.kind);
+      setAmount(String(editing.amount));
+      setBundles(String(editing.bundles));
+      setNote(editing.note ?? "");
+    } else if (value === "new") {
+      setKind("");
+      setAmount("");
+      setBundles("");
+      setNote("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
   const perBundle =
     Number(amount) > 0 && Number(bundles) > 0 ? Number(amount) / Number(bundles) : 0;
 
   return (
-    <div className="space-y-2 rounded-lg bg-muted/40 p-2">
-      <div className="grid grid-cols-2 gap-2">
-        <div className="space-y-1">
-          <Label className="text-xs">النوع</Label>
-          <Input value={kind} onChange={(e) => setKind(e.target.value)} placeholder="مثال: شامي" />
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-sm rounded-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5" /> {editing ? "تعديل الشروة" : "إضافة شروة"}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <IconField icon={Layers} label="النوع">
+            <Input value={kind} onChange={(e) => setKind(e.target.value)} placeholder="مثال: شامي" />
+          </IconField>
+          <div className="grid grid-cols-2 gap-2">
+            <IconField icon={Wallet} label="مبلغ الشراء">
+              <Input
+                inputMode="decimal"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
+              />
+            </IconField>
+            <IconField icon={Package} label="عدد العلاقي">
+              <Input
+                inputMode="decimal"
+                value={bundles}
+                onChange={(e) => setBundles(e.target.value.replace(/[^\d.]/g, ""))}
+              />
+            </IconField>
+          </div>
+          <IconField icon={StickyNote} label="ملاحظة">
+            <Input value={note} onChange={(e) => setNote(e.target.value)} />
+          </IconField>
+          {perBundle > 0 && (
+            <p className="rounded-xl bg-muted/50 p-2 text-center text-xs text-muted-foreground">
+              سعر العلاقة قبل المصاريف: {formatAmount(Math.round(perBundle))}
+            </p>
+          )}
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs">مبلغ الشراء</Label>
-          <Input
-            inputMode="numeric"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">عدد العلاقي</Label>
-          <Input
-            inputMode="numeric"
-            value={bundles}
-            onChange={(e) => setBundles(e.target.value.replace(/[^\d.]/g, ""))}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">ملاحظة</Label>
-          <Input value={note} onChange={(e) => setNote(e.target.value)} />
-        </div>
-      </div>
-      {perBundle > 0 && (
-        <p className="text-xs text-muted-foreground">
-          سعر العلاقة قبل المصاريف: {formatAmount(Math.round(perBundle))}
-        </p>
-      )}
-      <Button
-        size="sm"
-        className="w-full gap-1"
-        onClick={() => {
-          if (!kind.trim() || !Number(amount) || !Number(bundles)) {
-            toast.error("أدخل النوع والمبلغ وعدد العلاقي");
-            return;
-          }
-          onAdd({
-            id: newQatId(),
-            date: new Date().toISOString(),
-            kind: kind.trim(),
-            amount: Number(amount),
-            bundles: Number(bundles),
-            note: note.trim() || undefined,
-          });
-          setKind("");
-          setAmount("");
-          setBundles("");
-          setNote("");
-          toast.success("تمت إضافة الشروة");
-        }}
-      >
-        <Plus className="h-4 w-4" /> إضافة شروة
-      </Button>
-    </div>
+        <DialogFooter>
+          <Button
+            className="w-full gap-1 rounded-2xl"
+            onClick={() => {
+              if (!kind.trim() || !Number(amount) || !Number(bundles)) {
+                toast.error("أدخل النوع والمبلغ وعدد العلاقي");
+                return;
+              }
+              onSave({
+                id: editing?.id ?? newQatId(),
+                date: editing?.date ?? new Date().toISOString(),
+                kind: kind.trim(),
+                amount: Number(amount),
+                bundles: Number(bundles),
+                note: note.trim() || undefined,
+              });
+            }}
+          >
+            <Plus className="h-4 w-4" /> {editing ? "حفظ التعديل" : "إضافة الشروة"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-function ExpenseForm({ onAdd }: { onAdd: (e: Expense) => void }) {
+/* ---------------- حوار المصروف ---------------- */
+
+const EXPENSE_KINDS: { value: ExpenseKind; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { value: "shipping", label: "شحن", icon: Truck },
+  { value: "tax", label: "ضريبة", icon: BadgePercent },
+  { value: "other", label: "أخرى", icon: StickyNote },
+];
+
+function ExpenseDialog({
+  value,
+  onClose,
+  onSave,
+}: {
+  value: Expense | null | "new";
+  onClose: () => void;
+  onSave: (e: Expense) => void;
+}) {
+  const open = value !== null;
+  const editing = value && value !== "new" ? value : null;
   const [kind, setKind] = useState<ExpenseKind>("shipping");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
 
+  useMemo(() => {
+    if (editing) {
+      setKind(editing.kind);
+      setAmount(String(editing.amount));
+      setNote(editing.note ?? "");
+    } else if (value === "new") {
+      setKind("shipping");
+      setAmount("");
+      setNote("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
   return (
-    <div className="space-y-2 rounded-lg bg-muted/40 p-2">
-      <div className="grid grid-cols-2 gap-2">
-        <div className="space-y-1">
-          <Label className="text-xs">النوع</Label>
-          <Select value={kind} onValueChange={(v) => setKind(v as ExpenseKind)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="shipping">شحن</SelectItem>
-              <SelectItem value="tax">ضريبة</SelectItem>
-              <SelectItem value="other">أخرى</SelectItem>
-            </SelectContent>
-          </Select>
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-sm rounded-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Receipt className="h-5 w-5" /> {editing ? "تعديل المصروف" : "إضافة مصروف"}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">النوع</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {EXPENSE_KINDS.map((k) => (
+                <button
+                  key={k.value}
+                  type="button"
+                  onClick={() => setKind(k.value)}
+                  className={cn(
+                    "flex flex-col items-center gap-1 rounded-xl border p-2 text-xs transition",
+                    kind === k.value
+                      ? "border-primary bg-primary/10 text-primary font-semibold"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  <k.icon className="h-4 w-4" />
+                  {k.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <IconField icon={Wallet} label="المبلغ">
+            <Input
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
+            />
+          </IconField>
+          <IconField icon={StickyNote} label="ملاحظة">
+            <Input value={note} onChange={(e) => setNote(e.target.value)} />
+          </IconField>
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs">المبلغ</Label>
-          <Input
-            inputMode="numeric"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
-          />
-        </div>
-      </div>
-      <Input placeholder="ملاحظة" value={note} onChange={(e) => setNote(e.target.value)} />
-      <Button
-        size="sm"
-        variant="secondary"
-        className="w-full gap-1"
-        onClick={() => {
-          if (!Number(amount)) {
-            toast.error("أدخل المبلغ");
-            return;
-          }
-          onAdd({
-            id: newQatId(),
-            date: new Date().toISOString(),
-            kind,
-            amount: Number(amount),
-            note: note.trim() || undefined,
-          });
-          setAmount("");
-          setNote("");
-          toast.success("تمت إضافة المصروف");
-        }}
-      >
-        <Plus className="h-4 w-4" /> إضافة مصروف
-      </Button>
-    </div>
+        <DialogFooter>
+          <Button
+            className="w-full gap-1 rounded-2xl"
+            onClick={() => {
+              if (!Number(amount)) {
+                toast.error("أدخل المبلغ");
+                return;
+              }
+              onSave({
+                id: editing?.id ?? newQatId(),
+                date: editing?.date ?? new Date().toISOString(),
+                kind,
+                amount: Number(amount),
+                note: note.trim() || undefined,
+              });
+            }}
+          >
+            <Plus className="h-4 w-4" /> {editing ? "حفظ التعديل" : "إضافة المصروف"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-function CashForm({ onAdd }: { onAdd: (c: CashSale) => void }) {
+/* ---------------- حوار البيع النقدي ---------------- */
+
+function CashDialog({
+  value,
+  onClose,
+  onSave,
+}: {
+  value: CashSale | null | "new";
+  onClose: () => void;
+  onSave: (c: CashSale) => void;
+}) {
+  const open = value !== null;
+  const editing = value && value !== "new" ? value : null;
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
+
+  useMemo(() => {
+    if (editing) {
+      setAmount(String(editing.amount));
+      setNote(editing.note ?? "");
+    } else if (value === "new") {
+      setAmount("");
+      setNote("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
   return (
-    <div className="space-y-2 rounded-lg bg-muted/40 p-2">
-      <div className="grid grid-cols-2 gap-2">
-        <Input
-          inputMode="numeric"
-          placeholder="مبلغ البيع النقدي"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
-        />
-        <Input placeholder="ملاحظة" value={note} onChange={(e) => setNote(e.target.value)} />
-      </div>
-      <Button
-        size="sm"
-        variant="secondary"
-        className="w-full gap-1"
-        onClick={() => {
-          if (!Number(amount)) {
-            toast.error("أدخل المبلغ");
-            return;
-          }
-          onAdd({
-            id: newQatId(),
-            date: new Date().toISOString(),
-            amount: Number(amount),
-            note: note.trim() || undefined,
-          });
-          setAmount("");
-          setNote("");
-          toast.success("تمت إضافة البيع النقدي");
-        }}
-      >
-        <Plus className="h-4 w-4" /> إضافة بيع نقدي
-      </Button>
-    </div>
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-sm rounded-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Coins className="h-5 w-5" /> {editing ? "تعديل البيع النقدي" : "إضافة بيع نقدي"}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <IconField icon={Wallet} label="المبلغ">
+            <Input
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
+            />
+          </IconField>
+          <IconField icon={StickyNote} label="ملاحظة">
+            <Input value={note} onChange={(e) => setNote(e.target.value)} />
+          </IconField>
+        </div>
+        <DialogFooter>
+          <Button
+            className="w-full gap-1 rounded-2xl"
+            onClick={() => {
+              if (!Number(amount)) {
+                toast.error("أدخل المبلغ");
+                return;
+              }
+              onSave({
+                id: editing?.id ?? newQatId(),
+                date: editing?.date ?? new Date().toISOString(),
+                amount: Number(amount),
+                note: note.trim() || undefined,
+              });
+            }}
+          >
+            <Plus className="h-4 w-4" /> {editing ? "حفظ التعديل" : "إضافة البيع"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
