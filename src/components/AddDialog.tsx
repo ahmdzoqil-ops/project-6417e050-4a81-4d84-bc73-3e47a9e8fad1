@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { HandCoins, Wallet, Banknote } from "lucide-react";
+import { HandCoins, Wallet, Banknote, ArrowDownToLine } from "lucide-react";
 import { toast } from "sonner";
 import { NameSuggest } from "@/components/NameSuggest";
 import type { Customer, Transaction, TxType } from "@/lib/storage";
