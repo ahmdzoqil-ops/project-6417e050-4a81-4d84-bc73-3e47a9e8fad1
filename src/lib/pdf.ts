@@ -1,74 +1,123 @@
 import { formatAmount, formatDate } from "@/lib/format";
 import { customerBalance, type Customer, type Profile, type Transaction } from "@/lib/storage";
+import { APP_NAME, APP_TAGLINE, DEVELOPER, APP_VERSION } from "@/lib/settings";
 
-function esc(s: string) {
-  return s.replace(/[&<>]/g, (c) =>
+export function esc(s: string) {
+  return String(s ?? "").replace(/[&<>]/g, (c) =>
     c === "&" ? "&amp;" : c === "<" ? "&lt;" : "&gt;",
   );
 }
 
-function reportHtml(
-  customer: Customer,
-  rows: Transaction[],
-  balance: number,
-  profile: Profile,
-) {
+/* ---------------- ألوان الهوية ---------------- */
+
+const TONES: Record<string, { bg: string; fg: string; border: string }> = {
+  rose: { bg: "#fff1f2", fg: "#be123c", border: "#fecdd3" },
+  emerald: { bg: "#ecfdf5", fg: "#047857", border: "#a7f3d0" },
+  sky: { bg: "#f0f9ff", fg: "#0369a1", border: "#bae6fd" },
+  amber: { bg: "#fffbeb", fg: "#b45309", border: "#fde68a" },
+  slate: { bg: "#f8fafc", fg: "#334155", border: "#e2e8f0" },
+};
+
+/* ---------------- شعار احتياطي (SVG) ---------------- */
+
+function monogram(text: string) {
+  const letter = esc((text || "د").trim().charAt(0) || "د");
+  return `<div style="width:72px;height:72px;border-radius:50%;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#4f46e5,#0ea5e9);color:#fff;font-size:28px;font-weight:800;box-shadow:0 4px 10px rgba(79,70,229,.25)">${letter}</div>`;
+}
+
+/* ---------------- غلاف موحّد ---------------- */
+
+export function reportShell(title: string, profile: Profile, inner: string) {
   const logo = profile.photo
-    ? `<img src="${profile.photo}" style="width:70px;height:70px;border-radius:50%;object-fit:cover;margin:0 auto 8px;display:block" />`
-    : "";
-  const body = rows
-    .map(
-      (t) => `<tr>
-        <td>${formatDate(t.date)}</td>
-        <td>${t.type === "debt" ? "دين" : "سداد"}</td>
-        <td>${formatAmount(t.amount)}</td>
-        <td>${esc(t.note ?? "")}</td>
-      </tr>`,
-    )
-    .join("");
+    ? `<img src="${profile.photo}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;margin:0 auto 10px;display:block;border:3px solid #fff;box-shadow:0 4px 10px rgba(15,23,42,.12)" />`
+    : monogram(profile.shopName || profile.userName || APP_NAME);
 
-  return `<div style="width:794px;padding:32px;background:#fff;color:#111;font-family:'Segoe UI',Tahoma,Arial,sans-serif;direction:rtl">
-    <div style="text-align:center;border-bottom:2px solid #e11d48;padding-bottom:12px">
+  const metaLine = [profile.userName, profile.phone, profile.area]
+    .filter(Boolean)
+    .map((v) => esc(String(v)))
+    .join(" &nbsp;•&nbsp; ");
+
+  return `<div style="width:794px;background:#f8fafc;color:#0f172a;font-family:'Segoe UI',Tahoma,Arial,sans-serif;direction:rtl;line-height:1.7">
+    <div style="background:linear-gradient(135deg,#eef2ff,#f0f9ff);padding:36px 36px 24px;text-align:center;border-bottom:1px solid #e2e8f0">
       ${logo}
-      <div style="font-size:24px;font-weight:800">${esc(profile.shopName || "دينك بصوتك")}</div>
-      <div style="font-size:13px;color:#555">${esc(profile.userName || "")}${profile.phone ? " • " + esc(profile.phone) : ""}${profile.area ? " • " + esc(profile.area) : ""}</div>
+      <div style="font-size:26px;font-weight:800;color:#1e293b">${esc(profile.shopName || APP_NAME)}</div>
+      ${metaLine ? `<div style="margin-top:4px;font-size:13px;color:#64748b">${metaLine}</div>` : ""}
+      <div style="margin-top:14px;display:inline-block;background:#4f46e5;color:#fff;font-size:15px;font-weight:700;padding:7px 22px;border-radius:999px">${esc(title)}</div>
+      <div style="margin-top:10px;font-size:12px;color:#94a3b8">تاريخ الإنشاء: ${formatDate(new Date().toISOString())}</div>
     </div>
 
-    <div style="margin-top:18px;display:flex;justify-content:space-between;font-size:15px">
-      <div>
-        <div style="font-weight:700;font-size:18px">${esc(customer.name)}</div>
-        ${customer.phone ? `<div style="color:#555">${esc(customer.phone)}</div>` : ""}
-        <div style="color:#555">عدد العمليات: ${rows.length}</div>
-      </div>
-      <div style="text-align:left">
-        <div style="color:#555">تاريخ التقرير</div>
-        <div>${formatDate(new Date().toISOString())}</div>
-        <div style="margin-top:6px;color:#555">الرصيد المتبقي</div>
-        <div style="font-size:22px;font-weight:800;color:#e11d48">${formatAmount(balance)}</div>
-      </div>
+    <div style="padding:28px 36px 36px">
+      ${inner}
     </div>
 
-    <table style="width:100%;margin-top:18px;border-collapse:collapse;font-size:14px">
-      <thead>
-        <tr style="background:#f5f5f5">
-          <th style="border:1px solid #ddd;padding:8px">التاريخ</th>
-          <th style="border:1px solid #ddd;padding:8px">النوع</th>
-          <th style="border:1px solid #ddd;padding:8px">المبلغ</th>
-          <th style="border:1px solid #ddd;padding:8px">ملاحظة</th>
-        </tr>
-      </thead>
-      <tbody style="text-align:center">${body}</tbody>
-    </table>
-
-    <div style="margin-top:28px;border-top:1px solid #ddd;padding-top:10px;text-align:center;font-size:12px;color:#777">
-      تم إنشاء هذا التقرير بواسطة تطبيق «دينك بصوتك» — إدارة الديون والجيب محليًا على الجهاز
+    <div style="padding:20px 36px 30px">
+      <div style="border-top:1px solid #e2e8f0;padding-top:16px;display:flex;align-items:center;justify-content:center;gap:12px;text-align:center">
+        <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#4f46e5,#0ea5e9);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:800">د</div>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#334155">${esc(APP_NAME)}</div>
+          <div style="font-size:11px;color:#94a3b8">${esc(APP_TAGLINE)} — ${esc(DEVELOPER)} — الإصدار ${esc(APP_VERSION)}</div>
+        </div>
+      </div>
     </div>
   </div>`;
 }
 
+/* ---------------- بطاقات ملخّص ---------------- */
+
+export function summaryCards(
+  cards: { label: string; value: string; tone?: "rose" | "emerald" | "sky" | "amber" | "slate" }[],
+) {
+  return `<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:22px">
+    ${cards
+      .map((c) => {
+        const t = TONES[c.tone ?? "slate"];
+        return `<div style="flex:1;min-width:150px;background:${t.bg};border:1px solid ${t.border};border-radius:14px;padding:14px 16px;text-align:center">
+          <div style="font-size:12px;color:${t.fg};opacity:.85;font-weight:600">${esc(c.label)}</div>
+          <div style="margin-top:6px;font-size:19px;font-weight:800;color:${t.fg}">${esc(c.value)}</div>
+        </div>`;
+      })
+      .join("")}
+  </div>`;
+}
+
+/* ---------------- عنوان قسم ---------------- */
+
+export function sectionTitle(text: string) {
+  return `<div style="font-size:16px;font-weight:800;color:#1e293b;margin:22px 0 10px;padding-right:10px;border-right:4px solid #4f46e5">${esc(text)}</div>`;
+}
+
+/* ---------------- جدول بيانات ---------------- */
+
+export function dataTable(headers: string[], rows: string[][]) {
+  const head = headers
+    .map(
+      (h, i) =>
+        `<th style="padding:10px;background:#4f46e5;color:#fff;font-size:13px;font-weight:700;text-align:right;white-space:normal;word-break:break-word;${i === 0 ? "border-top-right-radius:10px" : ""}${i === headers.length - 1 ? "border-top-left-radius:10px" : ""}">${esc(h)}</th>`,
+    )
+    .join("");
+
+  const body = rows
+    .map(
+      (r, ri) =>
+        `<tr style="background:${ri % 2 === 0 ? "#ffffff" : "#f8fafc"}">${r
+          .map(
+            (c) =>
+              `<td style="padding:10px;font-size:13px;color:#334155;text-align:right;white-space:normal;word-break:break-word;border-bottom:1px solid #eef2f7">${esc(c)}</td>`,
+          )
+          .join("")}</tr>`,
+    )
+    .join("");
+
+  return `<table style="width:100%;border-collapse:separate;border-spacing:0;margin-top:6px;overflow:hidden;border-radius:10px;box-shadow:0 1px 3px rgba(15,23,42,.06)">
+    <thead><tr>${head}</tr></thead>
+    <tbody>${body || `<tr><td colspan="${headers.length}" style="padding:18px;text-align:center;color:#94a3b8;font-size:13px">لا توجد بيانات</td></tr>`}</tbody>
+  </table>`;
+}
+
+/* ---------------- تحويل HTML إلى PDF (يتفادى مشاكل oklch) ---------------- */
+
 async function htmlToPdfBlob(html: string) {
   const { jsPDF } = await import("jspdf");
-  // القياس أولًا داخل عنصر مخفي
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;left:-10000px;top:0;width:794px;";
   host.innerHTML = html;
@@ -76,7 +125,6 @@ async function htmlToPdfBlob(html: string) {
   const height = Math.ceil((host.firstElementChild as HTMLElement).scrollHeight) + 20;
   host.remove();
 
-  // الرسم عبر SVG foreignObject (يتفادى قراءة أنماط التطبيق)
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="794" height="${height}">` +
     `<foreignObject width="100%" height="100%">` +
@@ -123,7 +171,7 @@ function blobToBase64(blob: Blob) {
   });
 }
 
-async function deliver(blob: Blob, fileName: string) {
+async function shareOrDownload(blob: Blob, fileName: string) {
   const { Capacitor } = await import("@capacitor/core");
   if (Capacitor.isNativePlatform()) {
     const [{ Filesystem, Directory }, { Share }] = await Promise.all([
@@ -147,31 +195,34 @@ async function deliver(blob: Blob, fileName: string) {
   setTimeout(() => URL.revokeObjectURL(url), 3000);
 }
 
-/** توليد PDF من HTML جاهز ثم مشاركته أو تنزيله */
+function printHtml(html: string) {
+  const win = window.open("", "_blank");
+  if (!win) return;
+  win.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8" />
+    <title>طباعة التقرير</title></head><body style="margin:0">${html}</body></html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(() => {
+    win.print();
+  }, 300);
+}
+
+/** تنفيذ فعلي: مشاركة/تنزيل PDF أو الطباعة */
+export async function deliverReport(html: string, fileName: string, mode: "share" | "print") {
+  if (mode === "print") {
+    printHtml(html);
+    return;
+  }
+  const blob = await htmlToPdfBlob(html);
+  await shareOrDownload(blob, fileName);
+}
+
+/** يبني التقرير ثم يطلب من واجهة المستخدم عرضه (بدل التنزيل الفوري) */
 export async function shareHtmlReport(html: string, fileName: string) {
-  await deliver(await htmlToPdfBlob(html), fileName);
+  window.dispatchEvent(new CustomEvent("report:preview", { detail: { html, fileName } }));
 }
 
-/** غلاف موحّد لرأس/ذيل التقارير */
-export function reportShell(title: string, profile: Profile, inner: string) {
-  const logo = profile.photo
-    ? `<img src="${profile.photo}" style="width:70px;height:70px;border-radius:50%;object-fit:cover;margin:0 auto 8px;display:block" />`
-    : "";
-  return `<div style="width:794px;padding:32px;background:#fff;color:#111;font-family:'Segoe UI',Tahoma,Arial,sans-serif;direction:rtl">
-    <div style="text-align:center;border-bottom:2px solid #e11d48;padding-bottom:12px">
-      ${logo}
-      <div style="font-size:24px;font-weight:800">${esc(profile.shopName ?? "دينك بصوتك")}</div>
-      <div style="font-size:13px;color:#666">${esc(profile.userName ?? "")} ${profile.phone ? "— " + esc(profile.phone) : ""}</div>
-      <div style="margin-top:8px;font-size:18px;font-weight:700">${esc(title)}</div>
-    </div>
-    ${inner}
-    <div style="margin-top:28px;border-top:1px solid #ddd;padding-top:10px;text-align:center;font-size:12px;color:#777">
-      تم إنشاء هذا التقرير بواسطة تطبيق «دينك بصوتك» — إدارة الديون والجيب محليًا على الجهاز
-    </div>
-  </div>`;
-}
-
-/** إنشاء تقرير PDF لعميل ثم مشاركته أو تنزيله */
+/** إنشاء تقرير عميل احترافي وعرضه للمعاينة قبل المشاركة/الطباعة */
 export async function shareCustomerReport(
   customer: Customer,
   items: Transaction[],
@@ -180,8 +231,50 @@ export async function shareCustomerReport(
   const rows = items
     .filter((t) => t.customerId === customer.id)
     .sort((a, z) => a.date.localeCompare(z.date));
+
+  const totalDebt = rows.filter((t) => t.type === "debt").reduce((s, t) => s + t.amount, 0);
+  const totalPayment = rows.filter((t) => t.type === "payment").reduce((s, t) => s + t.amount, 0);
   const balance = customerBalance(items, customer.id);
-  const blob = await htmlToPdfBlob(reportHtml(customer, rows, balance, profile));
+
+  const cards = summaryCards([
+    { label: "إجمالي الديون", value: formatAmount(totalDebt), tone: "rose" },
+    { label: "إجمالي السداد", value: formatAmount(totalPayment), tone: "emerald" },
+    { label: "الرصيد المتبقي", value: formatAmount(balance), tone: "sky" },
+    { label: "عدد العمليات", value: String(rows.length), tone: "amber" },
+  ]);
+
+  const customerPhoto = customer.photo
+    ? `<img src="${customer.photo}" style="width:56px;height:56px;border-radius:50%;object-fit:cover" />`
+    : `<div style="width:56px;height:56px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#64748b">${esc(customer.name.charAt(0) || "ع")}</div>`;
+
+  const customerInfo = `<div style="display:flex;align-items:center;gap:14px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;margin-bottom:18px">
+    ${customerPhoto}
+    <div>
+      <div style="font-size:16px;font-weight:800;color:#1e293b">${esc(customer.name)}</div>
+      ${customer.phone ? `<div style="font-size:12px;color:#64748b">${esc(customer.phone)}</div>` : ""}
+    </div>
+  </div>`;
+
+  let running = 0;
+  const tableRows = rows.map((t) => {
+    running += t.type === "debt" ? t.amount : -t.amount;
+    return [
+      formatDate(t.date),
+      t.type === "debt" ? "دين" : "سداد",
+      formatAmount(t.amount),
+      t.note ?? "",
+      formatAmount(running),
+    ];
+  });
+
+  const inner = `
+    ${cards}
+    ${customerInfo}
+    ${sectionTitle("سجل العمليات")}
+    ${dataTable(["التاريخ", "النوع", "المبلغ", "ملاحظة", "الرصيد"], tableRows)}
+  `;
+
+  const html = reportShell(`كشف حساب: ${customer.name}`, profile, inner);
   const fileName = `تقرير-${customer.name.replace(/\s+/g, "-")}.pdf`;
-  await deliver(blob, fileName);
+  window.dispatchEvent(new CustomEvent("report:preview", { detail: { html, fileName } }));
 }
