@@ -74,6 +74,8 @@ import { LockScreen } from "@/components/LockScreen";
 import { isLockEnabled } from "@/lib/lock";
 import { DailyDebtsTab } from "@/components/DailyDebtsTab";
 import { PaymentSection } from "@/components/PaymentSection";
+import { WithdrawSection } from "@/components/WithdrawSection";
+
 import { transcribeAudio } from "@/lib/transcribe.functions";
 import { isNativeApp, transcribeViaRemote } from "@/lib/transcribeRemote";
 import {
