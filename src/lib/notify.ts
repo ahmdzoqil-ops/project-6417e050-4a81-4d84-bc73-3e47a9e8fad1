@@ -59,7 +59,7 @@ export function dueReminders(
         out.push({
           id: hashId("c:" + c.id),
           title: "تذكير مطالبة",
-          body: `مضى ${daysSince(ref)} يومًا بدون سداد من «${c.name}» — الرصيد المتبقي ${bal.toLocaleString("ar-EG")}`,
+          body: `مضى ${daysSince(ref)} يومًا بدون سداد من «${c.name}» — الرصيد المتبقي ${bal.toLocaleString("ar-EG-u-nu-latn")}`,
         });
       }
     }
@@ -74,7 +74,7 @@ export function dueReminders(
         out.push({
           id: hashId("t:" + t.id),
           title: "دين بدون سداد",
-          body: `دين «${t.name}» بمبلغ ${t.amount.toLocaleString("ar-EG")} مضى عليه ${daysSince(t.date)} يومًا`,
+          body: `دين «${t.name}» بمبلغ ${t.amount.toLocaleString("ar-EG-u-nu-latn")} مضى عليه ${daysSince(t.date)} يومًا`,
         });
       }
     }
