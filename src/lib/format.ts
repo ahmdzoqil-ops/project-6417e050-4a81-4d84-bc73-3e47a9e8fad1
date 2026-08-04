@@ -37,3 +37,10 @@ export function formatDayLabel(key: string) {
     day: "2-digit",
   });
 }
+
+export const txLabel: Record<string, string> = {
+  debt: "دين",
+  pocket: "جيب",
+  payment: "سداد",
+  withdraw: "سحب نقدي",
+};
