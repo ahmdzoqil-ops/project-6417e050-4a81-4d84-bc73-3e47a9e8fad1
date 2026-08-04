@@ -353,7 +353,14 @@ const TONES: Record<
     value: "text-sky-800 dark:text-sky-200",
     dot: "bg-sky-500",
   },
+  withdraw: {
+    card: "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/30",
+    label: "text-amber-700 dark:text-amber-300",
+    value: "text-amber-800 dark:text-amber-200",
+    dot: "bg-amber-500",
+  },
 };
+
 
 function TotalCard({
   label,
