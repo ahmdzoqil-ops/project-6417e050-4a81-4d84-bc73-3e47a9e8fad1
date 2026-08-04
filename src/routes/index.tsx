@@ -130,9 +130,19 @@ function App() {
       debt: dailyDebtTotal(items),
       pocket: pocketTotal(items),
       payment: paymentTotalToday(items),
+      withdraw: withdrawTotalToday(items),
     }),
     [items],
   );
+
+  useEffect(() => {
+    if (!hydrated || locked || !items.length) return;
+    const id = window.setTimeout(() => {
+      void runReminders(items, customers);
+    }, 1500);
+    return () => window.clearTimeout(id);
+  }, [hydrated, locked, items, customers]);
+
 
   const addTx = (t: NewTx) => {
     persist([{ ...t, id: newId(), date: new Date().toISOString() }, ...items]);
