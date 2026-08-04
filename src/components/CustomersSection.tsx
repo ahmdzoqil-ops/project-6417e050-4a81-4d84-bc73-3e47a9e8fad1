@@ -48,7 +48,9 @@ import { toast } from "sonner";
 import { formatAmount, formatDate } from "@/lib/format";
 import {
   customerBalance,
+  loadCustomers,
   newId,
+  saveCustomers,
   type Customer,
   type Profile,
   type Transaction,
@@ -414,7 +416,12 @@ function CustomerPage({
 
   const removeCustomer = () => {
     for (const t of rows) onDeleteTx(t.id);
-    onDeleteCustomer?.(customer.id);
+    if (onDeleteCustomer) {
+      onDeleteCustomer(customer.id);
+    } else {
+      // لا يوجد رابط مباشر لحذف العميل من الحالة الأعلى — نحذفه من التخزين مباشرة
+      saveCustomers(loadCustomers().filter((c) => c.id !== customer.id));
+    }
     toast.success("تم حذف العميل");
     onBack();
   };
