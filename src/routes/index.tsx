@@ -55,7 +55,7 @@ import {
   type Transaction,
   type TxType,
 } from "@/lib/storage";
-import { formatAmount, formatDate, formatTime } from "@/lib/format";
+import { formatAmount, formatDate, formatTime, txLabel } from "@/lib/format";
 import {
   matchesQuery,
   dailyDebtTotal,
@@ -298,6 +298,8 @@ function App() {
         <Plus className="h-8 w-8" />
       </button>
 
+      <ReportViewer />
+
       <AddDialog
         open={adding}
         onOpenChange={setAdding}
@@ -380,8 +382,8 @@ function HomeTab({
           </ul>
         )}
         <p className="mt-2 text-center text-[11px] text-muted-foreground">
-          يبدأ يوم جديد تلقائيًا: يُصفَّر الجيب والدين اليومي والسداد اليومي —
-          والسجل الكامل داخل القائمة العلوية.
+          يبدأ اليوم الجديد عند الساعة 03:00 فجرًا — تبقى بيانات اليوم ظاهرة
+          حتى ذلك الوقت ثم تنتقل تلقائيًا إلى السجل والتقارير.
         </p>
       </section>
     </div>
