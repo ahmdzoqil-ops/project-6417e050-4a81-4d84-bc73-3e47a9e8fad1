@@ -317,7 +317,12 @@ function HomeTab({
 }: {
   items: Transaction[];
   customers: Customer[];
-  totals: { debt: number; pocket: number; payment: number };
+  totals: {
+    debt: number;
+    pocket: number;
+    payment: number;
+    withdraw: number;
+  };
   onAdd: (t: NewTx) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -337,11 +342,17 @@ function HomeTab({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <TotalCard label="دين اليوم" amount={totals.debt} tone="debt" />
         <TotalCard label="الجيب" amount={totals.pocket} tone="pocket" />
         <TotalCard label="سداد اليوم" amount={totals.payment} tone="payment" />
+        <TotalCard
+          label="السحب النقدي"
+          amount={totals.withdraw}
+          tone="withdraw"
+        />
       </div>
+
 
       <VoicePanel customers={customers} items={items} onAdd={onAdd} />
 

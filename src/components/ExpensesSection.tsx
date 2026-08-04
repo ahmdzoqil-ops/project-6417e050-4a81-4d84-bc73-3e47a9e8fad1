@@ -35,6 +35,7 @@ import {
   Truck,
   BadgePercent,
   Sparkles,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatAmount } from "@/lib/format";
@@ -413,6 +414,19 @@ function IconField({
   );
 }
 
+
+function BackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="absolute left-4 top-4 flex items-center gap-1 rounded-full px-2 py-1 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground"
+    >
+      <ArrowRight className="h-4 w-4" /> رجوع
+    </button>
+  );
+}
+
 /* ---------------- حوار الشروة ---------------- */
 
 function PurchaseDialog({
@@ -451,7 +465,8 @@ function PurchaseDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-sm rounded-2xl">
+      <DialogContent className="max-w-sm rounded-2xl [&>button]:hidden">
+        <BackButton onClick={onClose} />
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" /> {editing ? "تعديل الشروة" : "إضافة شروة"}
@@ -550,7 +565,8 @@ function ExpenseDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-sm rounded-2xl">
+      <DialogContent className="max-w-sm rounded-2xl [&>button]:hidden">
+        <BackButton onClick={onClose} />
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Receipt className="h-5 w-5" /> {editing ? "تعديل المصروف" : "إضافة مصروف"}
@@ -643,7 +659,8 @@ function CashDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-sm rounded-2xl">
+      <DialogContent className="max-w-sm rounded-2xl [&>button]:hidden">
+        <BackButton onClick={onClose} />
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Coins className="h-5 w-5" /> {editing ? "تعديل البيع النقدي" : "إضافة بيع نقدي"}
