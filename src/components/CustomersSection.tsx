@@ -39,6 +39,7 @@ import {
   FileDown,
   Camera,
   ShieldAlert,
+  Loader2,
   Phone,
   MessageCircle,
   Contact,
@@ -56,30 +57,13 @@ import {
   type Transaction,
 } from "@/lib/storage";
 import { matchesQuery } from "@/lib/derive";
-import { isLockEnabled, biometricVerify } from "@/lib/lock";
+import { confirmSensitive } from "@/lib/lock";
 import { loadSettings, DAY_PRESETS } from "@/lib/settings";
 import { AuthPrompt } from "@/components/LockScreen";
 import { shareCustomerReport } from "@/lib/pdf";
+import { pickContact, contactsSupported } from "@/lib/contacts";
 
 type NewTx = Omit<Transaction, "id" | "date">;
-
-/** واجهة Contact Picker API (غير معتمدة رسميًا في TypeScript) */
-type ContactPickerNavigator = Navigator & {
-  contacts: {
-    select: (
-      props: string[],
-      opts?: { multiple?: boolean },
-    ) => Promise<Array<{ name?: string[]; tel?: string[] }>>;
-  };
-};
-
-function hasContactPicker(): boolean {
-  return (
-    typeof navigator !== "undefined" &&
-    "contacts" in navigator &&
-    "ContactsManager" in window
-  );
-}
 
 async function pickContact(): Promise<{ name?: string; phone?: string } | null> {
   if (!hasContactPicker()) {
