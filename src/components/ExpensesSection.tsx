@@ -412,18 +412,20 @@ function Block({
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   children: React.ReactNode;
-  onAdd: () => void;
+  onAdd?: () => void;
   addLabel: string;
 }) {
   return (
-    <div className="space-y-2 rounded-2xl border p-3">
+    <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
       <div className="flex items-center justify-between">
         <p className="flex items-center gap-2 font-semibold">
           <Icon className="h-4 w-4 text-muted-foreground" /> {title}
         </p>
-        <Button size="sm" className="gap-1 rounded-full" onClick={onAdd}>
-          <Plus className="h-4 w-4" /> {addLabel}
-        </Button>
+        {onAdd ? (
+          <Button size="sm" className="gap-1 rounded-full" onClick={onAdd}>
+            <Plus className="h-4 w-4" /> {addLabel}
+          </Button>
+        ) : null}
       </div>
       <div className="space-y-2">{children}</div>
     </div>
@@ -444,11 +446,11 @@ function Row({
   title: string;
   subtitle?: string;
   amount: number;
-  onEdit: () => void;
-  onDelete: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-2xl border bg-card p-2 shadow-sm">
+    <div className="flex items-center gap-2 rounded-2xl border bg-muted/20 p-2.5">
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{title}</p>
         {subtitle ? (
@@ -456,12 +458,91 @@ function Row({
         ) : null}
       </div>
       <span className="font-bold tabular-nums">{formatAmount(amount)}</span>
-      <Button variant="ghost" size="icon" onClick={onEdit} aria-label="تعديل">
-        <Pencil className="h-4 w-4" />
-      </Button>
-      <Button variant="ghost" size="icon" onClick={onDelete} aria-label="حذف">
-        <Trash2 className="h-4 w-4 text-rose-600" />
-      </Button>
+      {onEdit ? (
+        <Button variant="ghost" size="icon" onClick={onEdit} aria-label="تعديل">
+          <Pencil className="h-4 w-4" />
+        </Button>
+      ) : null}
+      {onDelete ? (
+        <Button variant="ghost" size="icon" onClick={onDelete} aria-label="حذف">
+          <Trash2 className="h-4 w-4 text-rose-600" />
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+function SummaryLine({
+  label,
+  value,
+  bold,
+  tone,
+}: {
+  label: string;
+  value: number;
+  bold?: boolean;
+  tone?: "emerald" | "rose";
+}) {
+  return (
+    <p className="flex items-center justify-between text-sm">
+      <span className={cn(bold && "font-semibold")}>{label}</span>
+      <span
+        className={cn(
+          "tabular-nums",
+          bold ? "font-bold text-base" : "font-medium",
+          tone === "emerald" && "text-emerald-600",
+          tone === "rose" && "text-rose-600",
+        )}
+      >
+        {formatAmount(value)}
+      </span>
+    </p>
+  );
+}
+
+/* ---------------- بطاقة النتيجة التحفيزية ---------------- */
+
+const MOOD_TONE: Record<
+  Mood["tone"],
+  { card: string; badge: string; icon: React.ComponentType<{ className?: string }> }
+> = {
+  great: {
+    card: "bg-emerald-50 border-emerald-200 text-emerald-800",
+    badge: "bg-emerald-600 text-white",
+    icon: PartyPopper,
+  },
+  good: {
+    card: "bg-sky-50 border-sky-200 text-sky-800",
+    badge: "bg-sky-600 text-white",
+    icon: TrendingUp,
+  },
+  flat: {
+    card: "bg-slate-50 border-slate-200 text-slate-700",
+    badge: "bg-slate-500 text-white",
+    icon: Minus,
+  },
+  loss: {
+    card: "bg-rose-50 border-rose-200 text-rose-800",
+    badge: "bg-rose-600 text-white",
+    icon: TrendingDown,
+  },
+};
+
+function MoodCard({ mood, profit }: { mood: Mood; profit: number }) {
+  const t = MOOD_TONE[mood.tone];
+  return (
+    <div className={cn("flex items-center gap-3 rounded-2xl border p-4", t.card)}>
+      <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-full", t.badge)}>
+        <t.icon className="h-5 w-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="font-bold">{mood.title}</p>
+        <p className="text-xs opacity-90">{mood.text}</p>
+      </div>
+      <span className="shrink-0 text-lg font-extrabold tabular-nums">
+        {profit >= 0 ? "+" : "-"}
+        {formatAmount(Math.abs(profit))}
+      </span>
     </div>
   );
 }

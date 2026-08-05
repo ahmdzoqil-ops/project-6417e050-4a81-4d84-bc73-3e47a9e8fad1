@@ -114,12 +114,24 @@ function App() {
 
   useEffect(() => {
     reload();
-    setLocked(isLockEnabled());
+    setLocked(shouldLockNow());
     setHydrated(true);
     // بداية يوم جديد: إعادة الفحص عند العودة للتطبيق لتصفير اليوم السابق
     const onFocus = () => reload();
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        markActive();
+      } else {
+        reload();
+        if (shouldLockNow()) setLocked(true);
+      }
+    };
     window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, []);
 
   const persist = (next: Transaction[]) => {
