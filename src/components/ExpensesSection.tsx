@@ -36,6 +36,11 @@ import {
   BadgePercent,
   Sparkles,
   ArrowRight,
+  Loader2,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  PartyPopper,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatAmount } from "@/lib/format";
@@ -43,15 +48,19 @@ import { dayKey, startOfDay, type Profile, type Transaction } from "@/lib/storag
 import { dailyDebtTotal, pocketTotal } from "@/lib/derive";
 import { reportShell, shareHtmlReport } from "@/lib/pdf";
 import {
+  dayLabel,
   daySummary,
   expenseLabel,
   loadQatPruned,
   newQatId,
   ofDay,
+  profitMood,
+  recentDayKeys,
   saveQat,
   type CashSale,
   type Expense,
   type ExpenseKind,
+  type Mood,
   type Purchase,
   type QatData,
 } from "@/lib/qat";

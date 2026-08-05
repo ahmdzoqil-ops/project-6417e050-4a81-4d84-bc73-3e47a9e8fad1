@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ArrowDownToLine, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowDownToLine, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -58,14 +58,6 @@ export function WithdrawSection({
     [items],
   );
   const total = rows.reduce((s, t) => s + t.amount, 0);
-
-  const openNew = () => {
-    setEditing(null);
-    setReason("");
-    setAmount("");
-    setNote("");
-    setOpen(true);
-  };
 
   const openEdit = (t: Transaction) => {
     setEditing(t);

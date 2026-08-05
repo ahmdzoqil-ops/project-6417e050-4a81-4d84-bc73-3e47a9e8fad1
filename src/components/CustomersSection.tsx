@@ -339,7 +339,7 @@ function CustomerPage({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editingInfo, setEditingInfo] = useState(false);
 
-  const { guard, node: guardPrompt } = useActionGuard();
+  const [reportLoading, setReportLoading] = useState(false);
 
   const rows = useMemo(
     () =>
@@ -365,7 +365,7 @@ function CustomerPage({
       // لا يوجد رابط مباشر لحذف العميل من الحالة الأعلى — نحذفه من التخزين مباشرة
       saveCustomers(loadCustomers().filter((c) => c.id !== customer.id));
     }
-    toast.success("تم حذف العميل");
+    toast.success("تم حذف العميل وجميع عملياته");
     onBack();
   };
 
