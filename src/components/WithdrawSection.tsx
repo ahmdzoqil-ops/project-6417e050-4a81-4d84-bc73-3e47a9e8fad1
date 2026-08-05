@@ -116,13 +116,9 @@ export function WithdrawSection({
         </CardContent>
       </Card>
 
-      <Button onClick={openNew} className="w-full gap-2">
-        <Plus className="h-4 w-4" /> تسجيل سحب نقدي
-      </Button>
-
       <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
-        لا يؤثر السحب النقدي على حسابات الديون أو المديونية — يظهر فقط في ملخص
-        اليوم والتقارير.
+        سجّل سحبًا جديدًا من زر (+) في الأسفل — لا يؤثر السحب النقدي على حسابات
+        الديون أو المديونية، ويظهر فقط في ملخص اليوم والتقارير.
       </p>
 
       {rows.length === 0 ? (

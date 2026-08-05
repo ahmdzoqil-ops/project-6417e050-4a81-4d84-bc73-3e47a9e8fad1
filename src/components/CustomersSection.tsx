@@ -59,28 +59,27 @@ import {
 import { matchesQuery } from "@/lib/derive";
 import { confirmSensitive } from "@/lib/lock";
 import { loadSettings, DAY_PRESETS } from "@/lib/settings";
-import { AuthPrompt } from "@/components/LockScreen";
 import { shareCustomerReport } from "@/lib/pdf";
 import { pickContact, contactsSupported } from "@/lib/contacts";
 
 type NewTx = Omit<Transaction, "id" | "date">;
 
-async function pickContact(): Promise<{ name?: string; phone?: string } | null> {
-  if (!hasContactPicker()) {
-    toast.info("اختيار جهات الاتصال غير مدعوم على هذا الجهاز، الرجاء الإدخال يدويًا");
+/** يختار جهة اتصال ويعرض رسالة عربية واضحة عند الفشل */
+async function pickContactWithToast(): Promise<{ name?: string; phone?: string } | null> {
+  if (!contactsSupported()) {
+    toast.error("جهات الاتصال غير متاحة على هذا الجهاز");
     return null;
   }
   try {
-    const nav = navigator as ContactPickerNavigator;
-    const res = await nav.contacts.select(["name", "tel"], { multiple: false });
-    const c = res?.[0];
-    if (!c) return null;
-    return {
-      name: c.name?.[0],
-      phone: c.tel?.[0],
-    };
-  } catch {
-    toast.error("تعذر الوصول إلى جهات الاتصال");
+    return await pickContact();
+  } catch (e) {
+    if (e instanceof Error && e.message === "permission-denied") {
+      toast.error("تم رفض إذن جهات الاتصال");
+    } else if (e instanceof Error && e.message === "unsupported") {
+      toast.error("جهات الاتصال غير متاحة على هذا الجهاز");
+    } else {
+      toast.error("تعذر الوصول إلى جهات الاتصال");
+    }
     return null;
   }
 }
@@ -244,7 +243,7 @@ export function CustomersSection({
                   size="icon"
                   aria-label="استيراد من جهات الاتصال"
                   onClick={async () => {
-                    const c = await pickContact();
+                    const c = await pickContactWithToast();
                     if (!c) return;
                     if (c.name && !name.trim()) setName(c.name);
                     if (c.phone) setPhone(c.phone);
@@ -305,46 +304,6 @@ function Avatar({ customer, size = 10 }: { customer: Customer; size?: 10 | 16 })
       {customer.name.trim().charAt(0) || "؟"}
     </span>
   );
-}
-
-/** يطلب تأكيد الهوية (بصمة أو PIN) قبل تنفيذ عملية حساسة، حسب إعدادات الحماية */
-function useActionGuard() {
-  const [authOpen, setAuthOpen] = useState(false);
-  const pending = useRef<(() => void) | null>(null);
-
-  const guard = (action: () => void) => {
-    const settings = loadSettings();
-    if (settings.security.actionLock && isLockEnabled()) {
-      pending.current = action;
-      // نحاول البصمة أولًا إن كانت متاحة، وإلا نعرض نافذة PIN/البصمة الموجودة
-      biometricVerify("تأكيد العملية").then((ok) => {
-        if (ok) {
-          const fn = pending.current;
-          pending.current = null;
-          fn?.();
-        } else {
-          setAuthOpen(true);
-        }
-      });
-    } else {
-      action();
-    }
-  };
-
-  const node = (
-    <AuthPrompt
-      open={authOpen}
-      onOpenChange={setAuthOpen}
-      reason="تأكيد العملية"
-      onSuccess={() => {
-        const fn = pending.current;
-        pending.current = null;
-        fn?.();
-      }}
-    />
-  );
-
-  return { guard, node };
 }
 
 function CustomerPage({
@@ -908,7 +867,7 @@ function CustomerInfoEditor({
                 size="icon"
                 aria-label="استيراد من جهات الاتصال"
                 onClick={async () => {
-                  const c = await pickContact();
+                  const c = await pickContactWithToast();
                   if (!c) return;
                   if (c.name) setName(c.name);
                   if (c.phone) setPhone(c.phone);
