@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
-import { ShieldCheck, ShieldAlert } from "lucide-react";
+import { ShieldCheck, ShieldAlert, Timer } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { LockSettings } from "@/components/LockSettings";
-import { loadSettings, saveSettings, type AppSettings } from "@/lib/settings";
+import {
+  LOCK_DELAYS,
+  loadSettings,
+  saveSettings,
+  type AppSettings,
+} from "@/lib/settings";
 
 export function SecuritySettings() {
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings());
@@ -31,8 +36,38 @@ export function SecuritySettings() {
           />
         </div>
         {settings.security.appLock && (
-          <CardContent className="pt-4">
+          <CardContent className="space-y-4 pt-4">
             <LockSettings />
+            <div className="space-y-2 rounded-xl border bg-muted/30 p-3">
+              <div className="flex items-center gap-2">
+                <Timer className="h-4 w-4 text-primary" />
+                <p className="text-sm font-medium">مهلة القفل بعد الخروج</p>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                لن يُطلب الرمز إذا عدت خلال هذه المدة.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {LOCK_DELAYS.map((d) => (
+                  <button
+                    key={d.value}
+                    type="button"
+                    onClick={() =>
+                      setSettings((s) => ({
+                        ...s,
+                        security: { ...s.security, lockDelayMinutes: d.value },
+                      }))
+                    }
+                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                      settings.security.lockDelayMinutes === d.value
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "bg-card hover:bg-muted"
+                    }`}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </CardContent>
         )}
       </Card>

@@ -471,16 +471,24 @@ function CustomerPage({
       <Button
         variant="outline"
         className="w-full gap-1"
-        disabled={false}
+        disabled={reportLoading}
         onClick={async () => {
+          setReportLoading(true);
           try {
             await shareCustomerReport(customer, items, profile);
           } catch {
-            toast.error("تعذر إنشاء التقرير");
+            toast.error("تعذّر إنشاء التقرير");
+          } finally {
+            setReportLoading(false);
           }
         }}
       >
-        <FileDown className="h-4 w-4" /> تقرير PDF
+        {reportLoading ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <FileDown className="h-4 w-4" />
+        )}{" "}
+        تقرير PDF
       </Button>
 
       <section>
@@ -703,9 +711,14 @@ function CustomerPage({
           <AlertDialogFooter className="gap-2 sm:gap-2">
             <AlertDialogCancel>إلغاء</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
-                if (confirmOne) onDeleteTx(confirmOne.id);
+              onClick={async () => {
+                const target = confirmOne;
                 setConfirmOne(null);
+                if (!(await confirmSensitive("حذف عملية"))) {
+                  toast.error("تم إلغاء العملية");
+                  return;
+                }
+                if (target) onDeleteTx(target.id);
                 toast.success("تم الحذف");
               }}
             >
@@ -721,17 +734,18 @@ function CustomerPage({
             <AlertDialogTitle>تصفير حساب العميل</AlertDialogTitle>
             <AlertDialogDescription>
               سيتم حذف {rows.length} عملية نهائيًا من كشف حساب هذا العميل.
-              {isLockEnabled()
-                ? " سيُطلب رمز التطبيق أو البصمة للتأكيد."
-                : " فعّل قفل التطبيق لحماية هذه العملية."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 sm:gap-2">
             <AlertDialogCancel>إلغاء</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
+              onClick={async () => {
                 setConfirmAll(false);
-                guard(wipeAll);
+                if (!(await confirmSensitive("تصفير حساب العميل"))) {
+                  toast.error("تم إلغاء العملية");
+                  return;
+                }
+                wipeAll();
               }}
             >
               متابعة
@@ -746,17 +760,18 @@ function CustomerPage({
             <AlertDialogTitle>حذف العميل</AlertDialogTitle>
             <AlertDialogDescription>
               سيتم حذف بيانات العميل وجميع عملياته ({rows.length}) نهائيًا.
-              {isLockEnabled()
-                ? " سيُطلب رمز التطبيق أو البصمة للتأكيد."
-                : " فعّل قفل التطبيق لحماية هذه العملية."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 sm:gap-2">
             <AlertDialogCancel>إلغاء</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
+              onClick={async () => {
                 setConfirmDelete(false);
-                guard(removeCustomer);
+                if (!(await confirmSensitive("حذف العميل"))) {
+                  toast.error("تم إلغاء العملية");
+                  return;
+                }
+                removeCustomer();
               }}
             >
               متابعة
@@ -765,7 +780,6 @@ function CustomerPage({
         </AlertDialogContent>
       </AlertDialog>
 
-      {guardPrompt}
     </div>
   );
 }
