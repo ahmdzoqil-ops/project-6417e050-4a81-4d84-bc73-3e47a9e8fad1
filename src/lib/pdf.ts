@@ -116,7 +116,12 @@ export function dataTable(headers: string[], rows: string[][]) {
 
 /* ---------------- تحويل HTML إلى PDF (يتفادى مشاكل oklch) ---------------- */
 
+/** ذاكرة مؤقتة: نفس التقرير لا يُبنى مرتين (مشاركة/حفظ) */
+let cache: { html: string; blob: Blob } | null = null;
+
 async function htmlToPdfBlob(html: string) {
+  if (cache && cache.html === html) return cache.blob;
+
   const { jsPDF } = await import("jspdf");
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;left:-10000px;top:0;width:794px;";
@@ -138,28 +143,35 @@ async function htmlToPdfBlob(html: string) {
     img.src = url;
   });
 
-  const scale = 2;
+  // دقة متوازنة: واضحة للقراءة وأسرع بكثير من 2x على الهواتف
+  const scale = height > 3000 ? 1.25 : 1.6;
   const canvas = document.createElement("canvas");
-  canvas.width = 794 * scale;
-  canvas.height = height * scale;
-  const ctx = canvas.getContext("2d")!;
+  canvas.width = Math.round(794 * scale);
+  canvas.height = Math.round(height * scale);
+  const ctx = canvas.getContext("2d", { alpha: false })!;
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-  const pdf = new jsPDF({ unit: "pt", format: "a4" });
+  const pdf = new jsPDF({ unit: "pt", format: "a4", compress: true });
   const w = pdf.internal.pageSize.getWidth();
   const pageH = pdf.internal.pageSize.getHeight();
   const h = (canvas.height * w) / canvas.width;
-  const data = canvas.toDataURL("image/jpeg", 0.92);
-  pdf.addImage(data, "JPEG", 0, 0, w, h);
+  const data = canvas.toDataURL("image/jpeg", 0.82);
+  pdf.addImage(data, "JPEG", 0, 0, w, h, undefined, "FAST");
   let offset = pageH;
   while (h - offset > 0) {
     pdf.addPage();
-    pdf.addImage(data, "JPEG", 0, -offset, w, h);
+    pdf.addImage(data, "JPEG", 0, -offset, w, h, undefined, "FAST");
     offset += pageH;
   }
-  return pdf.output("blob") as Blob;
+  // تحرير الذاكرة
+  canvas.width = 0;
+  canvas.height = 0;
+
+  const blob = pdf.output("blob") as Blob;
+  cache = { html, blob };
+  return blob;
 }
 
 function blobToBase64(blob: Blob) {
@@ -171,28 +183,48 @@ function blobToBase64(blob: Blob) {
   });
 }
 
-async function shareOrDownload(blob: Blob, fileName: string) {
-  const { Capacitor } = await import("@capacitor/core");
-  if (Capacitor.isNativePlatform()) {
-    const [{ Filesystem, Directory }, { Share }] = await Promise.all([
-      import("@capacitor/filesystem"),
-      import("@capacitor/share"),
-    ]);
-    const data = await blobToBase64(blob);
-    const res = await Filesystem.writeFile({
-      path: fileName,
-      data,
-      directory: Directory.Cache,
-    });
-    await Share.share({ title: fileName, url: res.uri });
-    return;
-  }
+function webDownload(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = fileName;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+
+/** حفظ الملف في مجلد المستندات ويعيد المسار */
+async function savePdf(blob: Blob, fileName: string): Promise<string | null> {
+  const { Capacitor } = await import("@capacitor/core");
+  if (!Capacitor.isNativePlatform()) {
+    webDownload(blob, fileName);
+    return null;
+  }
+  const { Filesystem, Directory } = await import("@capacitor/filesystem");
+  const res = await Filesystem.writeFile({
+    path: fileName,
+    data: await blobToBase64(blob),
+    directory: Directory.Documents,
+    recursive: true,
+  });
+  return res.uri;
+}
+
+async function sharePdf(blob: Blob, fileName: string) {
+  const { Capacitor } = await import("@capacitor/core");
+  if (!Capacitor.isNativePlatform()) {
+    webDownload(blob, fileName);
+    return;
+  }
+  const [{ Filesystem, Directory }, { Share }] = await Promise.all([
+    import("@capacitor/filesystem"),
+    import("@capacitor/share"),
+  ]);
+  const res = await Filesystem.writeFile({
+    path: fileName,
+    data: await blobToBase64(blob),
+    directory: Directory.Cache,
+  });
+  await Share.share({ title: fileName, url: res.uri });
 }
 
 function printHtml(html: string) {
@@ -207,14 +239,20 @@ function printHtml(html: string) {
   }, 300);
 }
 
-/** تنفيذ فعلي: مشاركة/تنزيل PDF أو الطباعة */
-export async function deliverReport(html: string, fileName: string, mode: "share" | "print") {
+/** تنفيذ فعلي: مشاركة/حفظ PDF أو الطباعة. يعيد مسار الحفظ إن وُجد. */
+export async function deliverReport(
+  html: string,
+  fileName: string,
+  mode: "share" | "save" | "print",
+): Promise<string | null> {
   if (mode === "print") {
     printHtml(html);
-    return;
+    return null;
   }
   const blob = await htmlToPdfBlob(html);
-  await shareOrDownload(blob, fileName);
+  if (mode === "save") return savePdf(blob, fileName);
+  await sharePdf(blob, fileName);
+  return null;
 }
 
 /** يبني التقرير ثم يطلب من واجهة المستخدم عرضه (بدل التنزيل الفوري) */
