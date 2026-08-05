@@ -777,30 +777,32 @@ function VoicePanel({
   };
 
   // مسار أندرويد: محرك التعرف على الكلام داخل الجهاز (بدون إنترنت)
-  const startNative = async () => {
+  // يعيد true إذا بدأ الاستماع فعلًا، وfalse لنستخدم التسجيل السحابي بديلًا.
+  const startNative = async (): Promise<boolean> => {
     try {
       const ok = await ensureSpeechPermission();
       if (!ok) {
         toast.error("تم رفض إذن الميكروفون. فعّل الإذن وحاول مرة أخرى");
-        return;
+        return true;
       }
       if (!(await isNativeSpeechAvailable())) {
-        toast.error("محرك التعرف على الكلام غير متوفر على هذا الجهاز", {
+        toast.message("سيتم استخدام التحويل عبر الإنترنت", {
           description:
-            "ثبّت تطبيق Google وحمّل حزمة اللغة العربية للاستخدام دون اتصال.",
-          duration: 10000,
+            "محرك التعرف داخل الجهاز غير متوفر. لتشغيله دون إنترنت ثبّت تطبيق Google وحمّل حزمة اللغة العربية.",
+          duration: 6000,
         });
-        return;
+        return false;
       }
       stopNativeRef.current = await startNativeListening();
       setState("recording");
+      return true;
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
-      toast.error("تعذّر بدء التعرف على الكلام", {
-        description: detail.slice(0, 300),
-        duration: 10000,
+      toast.message("تعذّر المحرك المحلي — جاري استخدام الإنترنت", {
+        description: detail.slice(0, 200),
+        duration: 5000,
       });
-      setState("idle");
+      return false;
     }
   };
 
@@ -823,15 +825,12 @@ function VoicePanel({
 
   const start = async () => {
     if (state !== "idle") return;
-    if (isNativeApp()) {
-      await startNative();
-      return;
-    }
+    if (isNativeApp() && (await startNative())) return;
     if (
       typeof navigator === "undefined" ||
       !navigator.mediaDevices?.getUserMedia
     ) {
-      toast.error("المتصفح لا يدعم تسجيل الصوت");
+      toast.error("الجهاز لا يدعم تسجيل الصوت");
       return;
     }
     let stream: MediaStream;
