@@ -71,7 +71,8 @@ import { AppMenu } from "@/components/AppMenu";
 import { NameSuggest } from "@/components/NameSuggest";
 import { AddDialog } from "@/components/AddDialog";
 import { LockScreen } from "@/components/LockScreen";
-import { isLockEnabled } from "@/lib/lock";
+import { NotificationCenter } from "@/components/NotificationCenter";
+import { markActive, shouldLockNow } from "@/lib/lock";
 import { DailyDebtsTab } from "@/components/DailyDebtsTab";
 import { PaymentSection } from "@/components/PaymentSection";
 import { WithdrawSection } from "@/components/WithdrawSection";
@@ -189,7 +190,14 @@ function App() {
   }
 
   if (locked) {
-    return <LockScreen onUnlock={() => setLocked(false)} />;
+    return (
+      <LockScreen
+        onUnlock={() => {
+          markActive();
+          setLocked(false);
+        }}
+      />
+    );
   }
 
   return (
@@ -215,7 +223,7 @@ function App() {
               {profile.shopName || "إدارة الديون والجيب — محليًا على جهازك"}
             </p>
           </div>
-          <div className="w-9" />
+          <NotificationCenter items={items} customers={customers} />
         </header>
 
         <Tabs value={tab} onValueChange={setTab} className="w-full">
