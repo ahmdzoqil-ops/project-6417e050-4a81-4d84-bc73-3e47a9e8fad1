@@ -21,7 +21,6 @@ import {
   Settings,
   Boxes,
   Code2,
-  Home,
   ChevronLeft,
   Bell,
   ShieldCheck,

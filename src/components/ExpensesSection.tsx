@@ -74,22 +74,26 @@ export function ExpensesSection({
 }) {
   const [data, setData] = useState<QatData>(() => loadQatPruned());
   const today = dayKey(startOfDay().toISOString());
+  const dayKeys = useMemo(() => recentDayKeys(), []);
+  const [selectedDay, setSelectedDay] = useState(today);
+  const isToday = selectedDay === today;
 
   const update = (next: QatData) => {
     setData(next);
     saveQat(next);
   };
 
-  const debtSales = dailyDebtTotal(items);
-  const pocketSales = pocketTotal(items);
+  const debtSales = isToday ? dailyDebtTotal(items) : 0;
+  const pocketSales = isToday ? pocketTotal(items) : 0;
   const summary = useMemo(
-    () => daySummary(data, today, debtSales, pocketSales),
-    [data, today, debtSales, pocketSales],
+    () => daySummary(data, selectedDay, debtSales, pocketSales),
+    [data, selectedDay, debtSales, pocketSales],
   );
+  const mood = useMemo(() => profitMood(summary.profit, summary.capital), [summary.profit, summary.capital]);
 
-  const purchases = ofDay(data.purchases, today);
-  const expenses = ofDay(data.expenses, today);
-  const cashSales = ofDay(data.cashSales, today);
+  const purchases = ofDay(data.purchases, selectedDay);
+  const expenses = ofDay(data.expenses, selectedDay);
+  const cashSales = ofDay(data.cashSales, selectedDay);
 
   const [purchaseDialog, setPurchaseDialog] = useState<Purchase | null | "new">(null);
   const [expenseDialog, setExpenseDialog] = useState<Expense | null | "new">(null);
@@ -99,8 +103,10 @@ export function ExpensesSection({
     id: string;
     label: string;
   } | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const exportPdf = async () => {
+    setExporting(true);
     try {
       const rows = summary.costs
         .map(
@@ -117,7 +123,7 @@ export function ExpensesSection({
       const line = (k: string, v: number) =>
         `<tr><td style="padding:6px 8px">${k}</td><td style="padding:6px 8px;font-weight:700">${formatAmount(Math.round(v))}</td></tr>`;
       const inner = `
-        <div style="margin-top:16px;font-size:14px">التاريخ: ${today}</div>
+        <div style="margin-top:16px;font-size:14px">التاريخ: ${selectedDay}</div>
         <table style="width:100%;border-collapse:collapse;margin-top:12px;font-size:13px" border="1">
           <thead style="background:#f3f4f6">
             <tr><th>النوع</th><th>مبلغ الشراء</th><th>العلاقي</th><th>سعر العلاقة</th><th>نصيب المصاريف</th><th>السعر الحقيقي</th></tr>
@@ -137,12 +143,14 @@ export function ExpensesSection({
           </tbody>
         </table>`;
       await shareHtmlReport(
-        reportShell(`تقرير اليوم — ${today}`, profile, inner),
-        `تقرير-اليوم-${today}.pdf`,
+        reportShell(`تقرير يوم — ${dayLabel(selectedDay)}`, profile, inner),
+        `تقرير-${selectedDay}.pdf`,
       );
       toast.success("تم إنشاء التقرير");
     } catch {
-      toast.error("تعذر إنشاء التقرير");
+      toast.error("تعذر إنشاء التقرير، حاول مرة أخرى");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -153,7 +161,28 @@ export function ExpensesSection({
   }, [summary.costs]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* شريط أيام الأرشيف */}
+      <div className="flex gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden">
+        {dayKeys.map((k) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setSelectedDay(k)}
+            className={cn(
+              "shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-medium transition",
+              selectedDay === k
+                ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-accent hover:text-foreground",
+            )}
+          >
+            {dayLabel(k, today)}
+          </button>
+        ))}
+      </div>
+
+      <MoodCard mood={mood} profit={summary.profit} />
+
       <div className="grid grid-cols-2 gap-2">
         <StatCard label="رأس المال" value={summary.capital} tone="amber" icon={Wallet} />
         <StatCard label="إجمالي المبيعات" value={summary.salesTotal} tone="emerald" icon={Coins} />
@@ -166,66 +195,101 @@ export function ExpensesSection({
         <StatCard label="السعر الحقيقي للعلاقة" value={Math.round(realPerBundleAvg)} tone="sky" icon={Layers} />
       </div>
 
-      <Button className="w-full gap-2 rounded-2xl" variant="outline" onClick={exportPdf}>
-        <FileText className="h-4 w-4" /> مشاركة تقرير اليوم (PDF)
+      <Button className="w-full gap-2 rounded-2xl" variant="outline" onClick={exportPdf} disabled={exporting}>
+        {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+        مشاركة تقرير {isToday ? "اليوم" : dayLabel(selectedDay, today)} (PDF)
       </Button>
 
       {/* الشروات */}
-      <Block icon={Package} title="الشروات (المشتريات)" onAdd={() => setPurchaseDialog("new")} addLabel="إضافة شروة">
-        {summary.costs.length === 0 && <Empty text="لا توجد شروات اليوم" />}
+      <Block
+        icon={Package}
+        title="الشروة (المشتريات)"
+        onAdd={isToday ? () => setPurchaseDialog("new") : undefined}
+        addLabel="إضافة شروة"
+      >
+        {summary.costs.length === 0 && <Empty text={`لا توجد شروات ${isToday ? "اليوم" : "في هذا اليوم"}`} />}
         {summary.costs.map((c) => (
           <Row
             key={c.purchase.id}
             title={c.purchase.kind}
             subtitle={`${c.purchase.bundles} علاقة · السعر الحقيقي ${formatAmount(Math.round(c.realPerBundle))}${c.purchase.note ? " · " + c.purchase.note : ""}`}
             amount={c.purchase.amount}
-            onEdit={() => setPurchaseDialog(c.purchase)}
-            onDelete={() =>
-              setConfirmDelete({ kind: "purchases", id: c.purchase.id, label: c.purchase.kind })
+            onEdit={isToday ? () => setPurchaseDialog(c.purchase) : undefined}
+            onDelete={
+              isToday
+                ? () => setConfirmDelete({ kind: "purchases", id: c.purchase.id, label: c.purchase.kind })
+                : undefined
             }
           />
         ))}
       </Block>
 
       {/* المصاريف */}
-      <Block icon={Receipt} title="المصاريف" onAdd={() => setExpenseDialog("new")} addLabel="إضافة مصروف">
-        {expenses.length === 0 && <Empty text="لا توجد مصاريف اليوم" />}
+      <Block
+        icon={Receipt}
+        title="المصاريف"
+        onAdd={isToday ? () => setExpenseDialog("new") : undefined}
+        addLabel="إضافة مصروف"
+      >
+        {expenses.length === 0 && <Empty text={`لا توجد مصاريف ${isToday ? "اليوم" : "في هذا اليوم"}`} />}
         {expenses.map((e) => (
           <Row
             key={e.id}
             title={expenseLabel[e.kind]}
             subtitle={e.note ?? ""}
             amount={e.amount}
-            onEdit={() => setExpenseDialog(e)}
-            onDelete={() =>
-              setConfirmDelete({ kind: "expenses", id: e.id, label: expenseLabel[e.kind] })
+            onEdit={isToday ? () => setExpenseDialog(e) : undefined}
+            onDelete={
+              isToday
+                ? () => setConfirmDelete({ kind: "expenses", id: e.id, label: expenseLabel[e.kind] })
+                : undefined
             }
           />
         ))}
       </Block>
 
-      {/* حركة البيع */}
-      <Block icon={Coins} title="حركة البيع" onAdd={() => setCashDialog("new")} addLabel="إضافة بيع نقدي">
-        {cashSales.length === 0 && <Empty text="لا توجد مبيعات نقدية اليوم" />}
+      {/* حركة البيع النقدي */}
+      <Block
+        icon={Coins}
+        title="البيع النقدي"
+        onAdd={isToday ? () => setCashDialog("new") : undefined}
+        addLabel="إضافة بيع نقدي"
+      >
+        {cashSales.length === 0 && <Empty text={`لا توجد مبيعات نقدية ${isToday ? "اليوم" : "في هذا اليوم"}`} />}
         {cashSales.map((c) => (
           <Row
             key={c.id}
             title="بيع نقدي"
             subtitle={c.note ?? ""}
             amount={c.amount}
-            onEdit={() => setCashDialog(c)}
-            onDelete={() => setConfirmDelete({ kind: "cashSales", id: c.id, label: "بيع نقدي" })}
+            onEdit={isToday ? () => setCashDialog(c) : undefined}
+            onDelete={isToday ? () => setConfirmDelete({ kind: "cashSales", id: c.id, label: "بيع نقدي" }) : undefined}
           />
         ))}
-        <div className="rounded-2xl border bg-muted/40 p-3 text-sm">
-          <p className="flex justify-between"><span>بيع دين (تلقائي)</span><span className="font-bold tabular-nums">{formatAmount(summary.debtSales)}</span></p>
-          <p className="flex justify-between"><span>جيب (تلقائي)</span><span className="font-bold tabular-nums">{formatAmount(summary.pocketSales)}</span></p>
-          <p className="mt-1 flex justify-between border-t pt-1"><span>الإجمالي</span><span className="font-bold tabular-nums">{formatAmount(summary.salesTotal)}</span></p>
-        </div>
       </Block>
 
+      {/* الملخص */}
+      <div className="space-y-1.5 rounded-2xl border bg-muted/30 p-4">
+        <p className="mb-2 flex items-center gap-2 font-semibold">
+          <Layers className="h-4 w-4 text-muted-foreground" /> الملخص
+        </p>
+        <SummaryLine label="بيع دين (تلقائي)" value={summary.debtSales} />
+        <SummaryLine label="جيب (تلقائي)" value={summary.pocketSales} />
+        <SummaryLine label="بيع نقدي" value={summary.cashSales} />
+        <div className="my-1.5 border-t" />
+        <SummaryLine label="إجمالي البيع" value={summary.salesTotal} bold />
+        <SummaryLine label="رأس المال" value={summary.capital} bold />
+        <div className="my-1.5 border-t" />
+        <SummaryLine
+          label={summary.profit >= 0 ? "الربح" : "الخسارة"}
+          value={Math.abs(summary.profit)}
+          bold
+          tone={summary.profit >= 0 ? "emerald" : "rose"}
+        />
+      </div>
+
       <p className="text-center text-[11px] text-muted-foreground">
-        عدد الشروات المسجلة اليوم: {purchases.length} · تُحفظ تقارير الضمار والمصاريف لمدة 7 أيام
+        يتم الاحتفاظ ببيانات الضمار والمصاريف لمدة 7 أيام
       </p>
 
       {/* حوارات الإضافة/التعديل */}
