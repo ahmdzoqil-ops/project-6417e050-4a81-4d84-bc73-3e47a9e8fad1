@@ -58,8 +58,8 @@ export function ReportViewer() {
     if (!detail) return;
     setBusy("save");
     try {
-      await deliverReport(detail.html, detail.fileName, "share");
-      toast.success("تم حفظ التقرير");
+      const uri = await deliverReport(detail.html, detail.fileName, "save");
+      toast.success(uri ? "تم حفظ التقرير في المستندات" : "تم حفظ التقرير");
     } catch {
       toast.error("تعذّر حفظ التقرير");
     } finally {

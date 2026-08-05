@@ -39,6 +39,7 @@ import {
   FileDown,
   Camera,
   ShieldAlert,
+  Loader2,
   Phone,
   MessageCircle,
   Contact,
@@ -56,47 +57,29 @@ import {
   type Transaction,
 } from "@/lib/storage";
 import { matchesQuery } from "@/lib/derive";
-import { isLockEnabled, biometricVerify } from "@/lib/lock";
+import { confirmSensitive } from "@/lib/lock";
 import { loadSettings, DAY_PRESETS } from "@/lib/settings";
-import { AuthPrompt } from "@/components/LockScreen";
 import { shareCustomerReport } from "@/lib/pdf";
+import { pickContact, contactsSupported } from "@/lib/contacts";
 
 type NewTx = Omit<Transaction, "id" | "date">;
 
-/** واجهة Contact Picker API (غير معتمدة رسميًا في TypeScript) */
-type ContactPickerNavigator = Navigator & {
-  contacts: {
-    select: (
-      props: string[],
-      opts?: { multiple?: boolean },
-    ) => Promise<Array<{ name?: string[]; tel?: string[] }>>;
-  };
-};
-
-function hasContactPicker(): boolean {
-  return (
-    typeof navigator !== "undefined" &&
-    "contacts" in navigator &&
-    "ContactsManager" in window
-  );
-}
-
-async function pickContact(): Promise<{ name?: string; phone?: string } | null> {
-  if (!hasContactPicker()) {
-    toast.info("اختيار جهات الاتصال غير مدعوم على هذا الجهاز، الرجاء الإدخال يدويًا");
+/** يختار جهة اتصال ويعرض رسالة عربية واضحة عند الفشل */
+async function pickContactWithToast(): Promise<{ name?: string; phone?: string } | null> {
+  if (!contactsSupported()) {
+    toast.error("جهات الاتصال غير متاحة على هذا الجهاز");
     return null;
   }
   try {
-    const nav = navigator as ContactPickerNavigator;
-    const res = await nav.contacts.select(["name", "tel"], { multiple: false });
-    const c = res?.[0];
-    if (!c) return null;
-    return {
-      name: c.name?.[0],
-      phone: c.tel?.[0],
-    };
-  } catch {
-    toast.error("تعذر الوصول إلى جهات الاتصال");
+    return await pickContact();
+  } catch (e) {
+    if (e instanceof Error && e.message === "permission-denied") {
+      toast.error("تم رفض إذن جهات الاتصال");
+    } else if (e instanceof Error && e.message === "unsupported") {
+      toast.error("جهات الاتصال غير متاحة على هذا الجهاز");
+    } else {
+      toast.error("تعذر الوصول إلى جهات الاتصال");
+    }
     return null;
   }
 }
@@ -260,7 +243,7 @@ export function CustomersSection({
                   size="icon"
                   aria-label="استيراد من جهات الاتصال"
                   onClick={async () => {
-                    const c = await pickContact();
+                    const c = await pickContactWithToast();
                     if (!c) return;
                     if (c.name && !name.trim()) setName(c.name);
                     if (c.phone) setPhone(c.phone);
@@ -323,46 +306,6 @@ function Avatar({ customer, size = 10 }: { customer: Customer; size?: 10 | 16 })
   );
 }
 
-/** يطلب تأكيد الهوية (بصمة أو PIN) قبل تنفيذ عملية حساسة، حسب إعدادات الحماية */
-function useActionGuard() {
-  const [authOpen, setAuthOpen] = useState(false);
-  const pending = useRef<(() => void) | null>(null);
-
-  const guard = (action: () => void) => {
-    const settings = loadSettings();
-    if (settings.security.actionLock && isLockEnabled()) {
-      pending.current = action;
-      // نحاول البصمة أولًا إن كانت متاحة، وإلا نعرض نافذة PIN/البصمة الموجودة
-      biometricVerify("تأكيد العملية").then((ok) => {
-        if (ok) {
-          const fn = pending.current;
-          pending.current = null;
-          fn?.();
-        } else {
-          setAuthOpen(true);
-        }
-      });
-    } else {
-      action();
-    }
-  };
-
-  const node = (
-    <AuthPrompt
-      open={authOpen}
-      onOpenChange={setAuthOpen}
-      reason="تأكيد العملية"
-      onSuccess={() => {
-        const fn = pending.current;
-        pending.current = null;
-        fn?.();
-      }}
-    />
-  );
-
-  return { guard, node };
-}
-
 function CustomerPage({
   customer,
   items,
@@ -396,7 +339,7 @@ function CustomerPage({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editingInfo, setEditingInfo] = useState(false);
 
-  const { guard, node: guardPrompt } = useActionGuard();
+  const [reportLoading, setReportLoading] = useState(false);
 
   const rows = useMemo(
     () =>
@@ -422,7 +365,7 @@ function CustomerPage({
       // لا يوجد رابط مباشر لحذف العميل من الحالة الأعلى — نحذفه من التخزين مباشرة
       saveCustomers(loadCustomers().filter((c) => c.id !== customer.id));
     }
-    toast.success("تم حذف العميل");
+    toast.success("تم حذف العميل وجميع عملياته");
     onBack();
   };
 
@@ -528,16 +471,24 @@ function CustomerPage({
       <Button
         variant="outline"
         className="w-full gap-1"
-        disabled={false}
+        disabled={reportLoading}
         onClick={async () => {
+          setReportLoading(true);
           try {
             await shareCustomerReport(customer, items, profile);
           } catch {
-            toast.error("تعذر إنشاء التقرير");
+            toast.error("تعذّر إنشاء التقرير");
+          } finally {
+            setReportLoading(false);
           }
         }}
       >
-        <FileDown className="h-4 w-4" /> تقرير PDF
+        {reportLoading ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <FileDown className="h-4 w-4" />
+        )}{" "}
+        تقرير PDF
       </Button>
 
       <section>
@@ -760,9 +711,14 @@ function CustomerPage({
           <AlertDialogFooter className="gap-2 sm:gap-2">
             <AlertDialogCancel>إلغاء</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
-                if (confirmOne) onDeleteTx(confirmOne.id);
+              onClick={async () => {
+                const target = confirmOne;
                 setConfirmOne(null);
+                if (!(await confirmSensitive("حذف عملية"))) {
+                  toast.error("تم إلغاء العملية");
+                  return;
+                }
+                if (target) onDeleteTx(target.id);
                 toast.success("تم الحذف");
               }}
             >
@@ -778,17 +734,18 @@ function CustomerPage({
             <AlertDialogTitle>تصفير حساب العميل</AlertDialogTitle>
             <AlertDialogDescription>
               سيتم حذف {rows.length} عملية نهائيًا من كشف حساب هذا العميل.
-              {isLockEnabled()
-                ? " سيُطلب رمز التطبيق أو البصمة للتأكيد."
-                : " فعّل قفل التطبيق لحماية هذه العملية."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 sm:gap-2">
             <AlertDialogCancel>إلغاء</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
+              onClick={async () => {
                 setConfirmAll(false);
-                guard(wipeAll);
+                if (!(await confirmSensitive("تصفير حساب العميل"))) {
+                  toast.error("تم إلغاء العملية");
+                  return;
+                }
+                wipeAll();
               }}
             >
               متابعة
@@ -803,17 +760,18 @@ function CustomerPage({
             <AlertDialogTitle>حذف العميل</AlertDialogTitle>
             <AlertDialogDescription>
               سيتم حذف بيانات العميل وجميع عملياته ({rows.length}) نهائيًا.
-              {isLockEnabled()
-                ? " سيُطلب رمز التطبيق أو البصمة للتأكيد."
-                : " فعّل قفل التطبيق لحماية هذه العملية."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 sm:gap-2">
             <AlertDialogCancel>إلغاء</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
+              onClick={async () => {
                 setConfirmDelete(false);
-                guard(removeCustomer);
+                if (!(await confirmSensitive("حذف العميل"))) {
+                  toast.error("تم إلغاء العملية");
+                  return;
+                }
+                removeCustomer();
               }}
             >
               متابعة
@@ -822,7 +780,6 @@ function CustomerPage({
         </AlertDialogContent>
       </AlertDialog>
 
-      {guardPrompt}
     </div>
   );
 }
@@ -924,7 +881,7 @@ function CustomerInfoEditor({
                 size="icon"
                 aria-label="استيراد من جهات الاتصال"
                 onClick={async () => {
-                  const c = await pickContact();
+                  const c = await pickContactWithToast();
                   if (!c) return;
                   if (c.name) setName(c.name);
                   if (c.phone) setPhone(c.phone);

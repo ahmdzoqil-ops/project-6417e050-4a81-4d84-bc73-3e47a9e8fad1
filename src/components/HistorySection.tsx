@@ -33,6 +33,7 @@ import { ArrowRight } from "lucide-react";
 import { formatAmount, formatDate, formatDayLabel, formatTime, txLabel } from "@/lib/format";
 import { dayKey, historyItems, type Transaction, type TxType } from "@/lib/storage";
 import { matchesQuery } from "@/lib/derive";
+import { confirmSensitive } from "@/lib/lock";
 
 type UpdateFn = (id: string, patch: Partial<Transaction>) => void;
 type DeleteFn = (id: string) => void;
@@ -255,7 +256,11 @@ function TxActionsSheet({
               <AlertDialogCancel>إلغاء</AlertDialogCancel>
               <AlertDialogAction
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                onClick={() => {
+                onClick={async () => {
+                  if (!(await confirmSensitive("حذف عملية"))) {
+                    toast.error("تم إلغاء العملية");
+                    return;
+                  }
                   onDeleteTx(t.id);
                   toast.success("تم حذف العملية");
                   close();

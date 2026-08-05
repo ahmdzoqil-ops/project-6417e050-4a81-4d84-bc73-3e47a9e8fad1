@@ -10,7 +10,7 @@ import {
   biometricAvailable,
   clearLock,
   isBiometricEnabled,
-  isLockEnabled,
+  hasPin,
   setBiometricEnabled,
   setPin as savePin,
   verifyPin,
@@ -25,7 +25,7 @@ export function LockSettings() {
   const [pin2, setPin2] = useState("");
 
   useEffect(() => {
-    setEnabled(isLockEnabled());
+    setEnabled(hasPin());
     setBio(isBiometricEnabled());
     biometricAvailable().then(setBioAvail);
   }, []);
