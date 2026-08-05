@@ -149,13 +149,12 @@ export function AppMenu({
 
           {view === "menu" && (
             <ul className="space-y-1.5">
-              <MenuItem icon={Home} label="الرئيسية" onClick={() => setOpen(false)} />
               <MenuItem icon={Users} label="المديونية" onClick={() => pushView("customers")} />
               <MenuItem icon={History} label="السجل والتقارير" onClick={() => pushView("history")} />
               <MenuItem icon={Boxes} label="الضمار والمصاريف" onClick={() => pushView("expenses")} />
+              <MenuItem icon={Settings} label="الإعدادات" onClick={() => pushView("settings")} />
               <MenuItem icon={DatabaseBackup} label="النسخ الاحتياطي" onClick={() => pushView("backup")} />
               <MenuItem icon={User} label="معلومات المستخدم" onClick={() => pushView("profile")} />
-              <MenuItem icon={Settings} label="الإعدادات" onClick={() => pushView("settings")} />
               <MenuItem icon={Info} label="حول التطبيق" onClick={() => pushView("about")} />
               <MenuItem icon={Code2} label="مطور التطبيق" onClick={() => pushView("developer")} />
             </ul>
@@ -165,7 +164,7 @@ export function AppMenu({
             <ProfileForm
               profile={profile}
               onSave={onProfileChange}
-              onDone={goBack}
+              onDone={() => setOpen(false)}
             />
           )}
 
@@ -182,7 +181,13 @@ export function AppMenu({
             />
           )}
 
-          {view === "history" && <HistorySection items={items} />}
+          {view === "history" && (
+            <HistorySection
+              items={items}
+              onUpdateTx={onUpdateTx}
+              onDeleteTx={onDeleteTx}
+            />
+          )}
 
           {view === "expenses" && <ExpensesSection items={items} profile={profile} />}
 
