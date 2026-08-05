@@ -14,6 +14,11 @@ export type SecuritySettings = {
   appLock: boolean;
   /** حماية العمليات الحساسة (حذف/تصفير) */
   actionLock: boolean;
+  /**
+   * مهلة القفل بالدقائق بعد الخروج من التطبيق.
+   * 0 = القفل فورًا.
+   */
+  lockDelayMinutes: number;
 };
 
 export type AppSettings = {
@@ -25,7 +30,7 @@ const KEY = "dainak-bisawtak.settings.v1";
 
 export const DEFAULT_SETTINGS: AppSettings = {
   notify: { customersOn: true, dailyOn: true, customersDays: 7, dailyDays: 3 },
-  security: { appLock: true, actionLock: true },
+  security: { appLock: true, actionLock: true, lockDelayMinutes: 1 },
 };
 
 export function loadSettings(): AppSettings {
@@ -50,7 +55,16 @@ export function saveSettings(s: AppSettings) {
 
 export const DAY_PRESETS = [1, 3, 7, 14, 30];
 
-export const APP_VERSION = "3.0";
+/** خيارات مهلة القفل بالدقائق */
+export const LOCK_DELAYS: { value: number; label: string }[] = [
+  { value: 0, label: "فوري" },
+  { value: 1, label: "دقيقة" },
+  { value: 5, label: "5 دقائق" },
+  { value: 15, label: "15 دقيقة" },
+  { value: 30, label: "30 دقيقة" },
+];
+
+export const APP_VERSION = "3.1";
 export const APP_NAME = "دينك بصوتك";
 export const APP_TAGLINE = "إدارة الديون والجيب محليًا على جهازك";
-export const DEVELOPER = "تطوير: فريق دينك بصوتك";
+export const DEVELOPER = "تطوير: أبو لورينا";
