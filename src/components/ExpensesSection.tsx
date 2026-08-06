@@ -502,50 +502,45 @@ function SummaryLine({
 
 /* ---------------- بطاقة النتيجة التحفيزية ---------------- */
 
-const MOOD_TONE: Record<
-  Mood["tone"],
-  { card: string; badge: string; icon: React.ComponentType<{ className?: string }> }
-> = {
+const MOOD_TONE: Record<Mood["tone"], { card: string; badge: string }> = {
+  fire: {
+    card: "bg-emerald-50 border-emerald-300 text-emerald-900",
+    badge: "bg-emerald-600/10",
+  },
   great: {
     card: "bg-emerald-50 border-emerald-200 text-emerald-800",
-    badge: "bg-emerald-600 text-white",
-    icon: PartyPopper,
+    badge: "bg-emerald-600/10",
   },
   good: {
     card: "bg-sky-50 border-sky-200 text-sky-800",
-    badge: "bg-sky-600 text-white",
-    icon: TrendingUp,
+    badge: "bg-sky-600/10",
   },
   flat: {
     card: "bg-slate-50 border-slate-200 text-slate-700",
-    badge: "bg-slate-500 text-white",
-    icon: Minus,
+    badge: "bg-slate-500/10",
   },
   loss: {
     card: "bg-rose-50 border-rose-200 text-rose-800",
-    badge: "bg-rose-600 text-white",
-    icon: TrendingDown,
+    badge: "bg-rose-600/10",
   },
 };
 
-function MoodCard({ mood, profit }: { mood: Mood; profit: number }) {
+/** بطاقة تحفيزية فقط — لا تُعرض أي نسبة ربح */
+function MoodCard({ mood }: { mood: Mood }) {
   const t = MOOD_TONE[mood.tone];
   return (
     <div className={cn("flex items-center gap-3 rounded-2xl border p-4", t.card)}>
-      <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-full", t.badge)}>
-        <t.icon className="h-5 w-5" />
+      <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-2xl", t.badge)}>
+        {mood.emoji}
       </div>
       <div className="min-w-0 flex-1">
         <p className="font-bold">{mood.title}</p>
         <p className="text-xs opacity-90">{mood.text}</p>
       </div>
-      <span className="shrink-0 text-lg font-extrabold tabular-nums">
-        {profit >= 0 ? "+" : "-"}
-        {formatAmount(Math.abs(profit))}
-      </span>
     </div>
   );
 }
+
 
 /* ---------------- حقل بأيقونة ---------------- */
 
