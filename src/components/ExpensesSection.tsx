@@ -216,7 +216,7 @@ export function ExpensesSection({
           <Row
             key={c.purchase.id}
             title={c.purchase.kind}
-            subtitle={`${c.purchase.bundles} علاقة · السعر الحقيقي ${formatAmount(Math.round(c.realPerBundle))}${c.purchase.note ? " · " + c.purchase.note : ""}`}
+            subtitle={`${c.purchase.bundles} علاقة${c.purchase.note ? " · " + c.purchase.note : ""}`}
             amount={c.purchase.amount}
             onEdit={isToday ? () => setPurchaseDialog(c.purchase) : undefined}
             onDelete={
