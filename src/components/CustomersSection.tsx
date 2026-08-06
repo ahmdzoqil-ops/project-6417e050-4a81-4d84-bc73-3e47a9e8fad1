@@ -351,10 +351,22 @@ function CustomerPage({
   const balance = customerBalance(items, customer.id);
   const openCount = rows.filter((t) => t.type === "debt").length;
 
+  /** تصفير الرصيد دون حذف أي عملية: تُضاف تسوية بقيمة الرصيد */
   const wipeAll = () => {
-    for (const t of rows) onDeleteTx(t.id);
-    toast.success("تم تصفير حساب العميل");
-    onBack();
+    const bal = customerBalance(items, customer.id);
+    if (Math.abs(bal) < 0.009) {
+      toast.info("رصيد العميل صفر بالفعل");
+      return;
+    }
+    onAddTx({
+      type: bal > 0 ? "payment" : "debt",
+      name: customer.name,
+      amount: Math.abs(bal),
+      note: "تسوية وتصفير الحساب",
+      customerId: customer.id,
+      ledgerOnly: true,
+    });
+    toast.success("تم تصفير رصيد العميل");
   };
 
   const removeCustomer = () => {
@@ -365,7 +377,7 @@ function CustomerPage({
       // لا يوجد رابط مباشر لحذف العميل من الحالة الأعلى — نحذفه من التخزين مباشرة
       saveCustomers(loadCustomers().filter((c) => c.id !== customer.id));
     }
-    toast.success("تم حذف العميل وجميع عملياته");
+    toast.success("تم حذف العميل وجميع بياناته");
     onBack();
   };
 
@@ -373,15 +385,19 @@ function CustomerPage({
     return (
       <CustomerInfoEditor
         customer={customer}
+        txCount={rows.length}
         onBack={() => setEditingInfo(false)}
         onSave={(patch) => {
           onUpdateCustomer(customer.id, patch);
           toast.success("تم حفظ بيانات العميل");
           setEditingInfo(false);
         }}
+        onWipe={wipeAll}
+        onDelete={removeCustomer}
       />
     );
   }
+
 
   return (
     <div className="space-y-3">
