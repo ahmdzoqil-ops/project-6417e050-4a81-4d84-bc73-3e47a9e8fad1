@@ -44,6 +44,8 @@ import {
   MessageCircle,
   Contact,
   ImageOff,
+  Eraser,
+
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatAmount, formatDate } from "@/lib/format";
@@ -335,8 +337,8 @@ function CustomerPage({
   const [eAmount, setEAmount] = useState("");
   const [eNote, setENote] = useState("");
   const [confirmOne, setConfirmOne] = useState<Transaction | null>(null);
-  const [confirmAll, setConfirmAll] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+
+
   const [editingInfo, setEditingInfo] = useState(false);
 
   const [reportLoading, setReportLoading] = useState(false);
