@@ -214,10 +214,16 @@ export function AppMenu({
   );
 }
 
-function MenuHeader({ profile }: { profile: Profile }) {
+function MenuHeader({
+  profile,
+  onOpenProfile,
+}: {
+  profile: Profile;
+  onOpenProfile: () => void;
+}) {
   const initials = (profile.userName ?? "").trim().slice(0, 1) || "؟";
   return (
-    <div className="relative overflow-hidden bg-gradient-to-b from-primary/20 via-primary/10 to-transparent px-4 pb-6 pt-8">
+    <div className="relative overflow-hidden bg-gradient-to-b from-primary/25 via-primary/10 to-transparent px-4 pb-5 pt-8">
       <div className="pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full bg-primary/20 blur-2xl" />
       <div className="pointer-events-none absolute -right-6 top-6 h-24 w-24 rounded-full bg-primary/10 blur-xl" />
       <div className="relative flex flex-col items-center gap-3 text-center">
@@ -234,10 +240,18 @@ function MenuHeader({ profile }: { profile: Profile }) {
             <p className="mt-0.5 text-sm text-muted-foreground">{profile.shopName}</p>
           )}
         </div>
+        <Button
+          size="sm"
+          onClick={onOpenProfile}
+          className="mt-1 gap-2 rounded-full px-5 shadow-md"
+        >
+          <User className="h-4 w-4" /> معلومات المستخدم
+        </Button>
       </div>
     </div>
   );
 }
+
 
 function MenuItem({
   icon: Icon,
