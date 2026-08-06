@@ -46,7 +46,7 @@ import { toast } from "sonner";
 import { formatAmount } from "@/lib/format";
 import { dayKey, startOfDay, type Profile, type Transaction } from "@/lib/storage";
 import { dailyDebtTotal, pocketTotal } from "@/lib/derive";
-import { reportShell, shareHtmlReport } from "@/lib/pdf";
+import { dataTable, reportShell, sectionTitle, shareHtmlReport, summaryCards } from "@/lib/pdf";
 import {
   dayLabel,
   daySummary,
@@ -108,45 +108,53 @@ export function ExpensesSection({
   const exportPdf = async () => {
     setExporting(true);
     try {
-      const rows = summary.costs
-        .map(
-          (c) => `<tr>
-            <td>${c.purchase.kind}</td>
-            <td>${formatAmount(c.purchase.amount)}</td>
-            <td>${c.purchase.bundles}</td>
-            <td>${formatAmount(Math.round(c.basePerBundle))}</td>
-            <td>${formatAmount(Math.round(c.expenseShare))}</td>
-            <td>${formatAmount(Math.round(c.realPerBundle))}</td>
-          </tr>`,
-        )
-        .join("");
-      const line = (k: string, v: number) =>
-        `<tr><td style="padding:6px 8px">${k}</td><td style="padding:6px 8px;font-weight:700">${formatAmount(Math.round(v))}</td></tr>`;
+      const purchaseRows = summary.costs.map((c) => [
+        c.purchase.kind,
+        formatAmount(c.purchase.amount),
+        String(c.purchase.bundles),
+        c.purchase.note ?? "",
+      ]);
+      const expenseRows = expenses.map((e) => [
+        expenseLabel[e.kind],
+        formatAmount(e.amount),
+        e.note ?? "",
+      ]);
       const inner = `
-        <div style="margin-top:16px;font-size:14px">التاريخ: ${selectedDay}</div>
-        <table style="width:100%;border-collapse:collapse;margin-top:12px;font-size:13px" border="1">
-          <thead style="background:#f3f4f6">
-            <tr><th>النوع</th><th>مبلغ الشراء</th><th>العلاقي</th><th>سعر العلاقة</th><th>نصيب المصاريف</th><th>السعر الحقيقي</th></tr>
-          </thead>
-          <tbody style="text-align:center">${rows || `<tr><td colspan="6">لا توجد مشتريات</td></tr>`}</tbody>
-        </table>
-        <table style="width:100%;border-collapse:collapse;margin-top:16px;font-size:14px" border="1">
-          <tbody>
-            ${line("إجمالي المشتريات", summary.purchasesTotal)}
-            ${line("إجمالي المصاريف", summary.expensesTotal)}
-            ${line("رأس المال", summary.capital)}
-            ${line("بيع نقدي", summary.cashSales)}
-            ${line("بيع دين", summary.debtSales)}
-            ${line("جيب", summary.pocketSales)}
-            ${line("إجمالي البيع", summary.salesTotal)}
-            ${line(summary.profit >= 0 ? "الربح" : "الخسارة", Math.abs(summary.profit))}
-          </tbody>
-        </table>`;
+        ${summaryCards([
+          { label: "رأس المال", value: formatAmount(Math.round(summary.capital)), tone: "amber" },
+          { label: "إجمالي المبيعات", value: formatAmount(Math.round(summary.salesTotal)), tone: "emerald" },
+          {
+            label: summary.profit >= 0 ? "الربح" : "الخسارة",
+            value: formatAmount(Math.round(Math.abs(summary.profit))),
+            tone: summary.profit >= 0 ? "emerald" : "rose",
+          },
+          { label: "إجمالي المصاريف", value: formatAmount(Math.round(summary.expensesTotal)), tone: "sky" },
+        ])}
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;margin-bottom:18px;display:flex;align-items:center;gap:12px">
+          <div style="font-size:26px">${mood.emoji}</div>
+          <div>
+            <div style="font-size:15px;font-weight:800;color:#1e293b">${mood.title}</div>
+            <div style="font-size:12px;color:#64748b">${mood.text}</div>
+          </div>
+        </div>
+        ${sectionTitle("الشروة (المشتريات)")}
+        ${dataTable(["النوع", "مبلغ الشراء", "عدد العلاقي", "ملاحظة"], purchaseRows)}
+        ${sectionTitle("المصاريف")}
+        ${dataTable(["النوع", "المبلغ", "ملاحظة"], expenseRows)}
+        ${sectionTitle("حركة البيع")}
+        ${dataTable(
+          ["البند", "المبلغ"],
+          [
+            ["بيع نقدي", formatAmount(Math.round(summary.cashSales))],
+            ["بيع دين", formatAmount(Math.round(summary.debtSales))],
+            ["جيب", formatAmount(Math.round(summary.pocketSales))],
+            ["إجمالي البيع", formatAmount(Math.round(summary.salesTotal))],
+          ],
+        )}`;
       await shareHtmlReport(
-        reportShell(`تقرير يوم — ${dayLabel(selectedDay)}`, profile, inner),
+        reportShell(`تقرير يوم — ${dayLabel(selectedDay, today)}`, profile, inner),
         `تقرير-${selectedDay}.pdf`,
       );
-      toast.success("تم إنشاء التقرير");
     } catch {
       toast.error("تعذر إنشاء التقرير، حاول مرة أخرى");
     } finally {
@@ -154,11 +162,6 @@ export function ExpensesSection({
     }
   };
 
-  const realPerBundleAvg = useMemo(() => {
-    const totalBundles = summary.costs.reduce((s, c) => s + c.purchase.bundles, 0);
-    if (totalBundles <= 0) return 0;
-    return summary.costs.reduce((s, c) => s + c.realPerBundle * c.purchase.bundles, 0) / totalBundles;
-  }, [summary.costs]);
 
   return (
     <div className="space-y-5">
@@ -181,7 +184,7 @@ export function ExpensesSection({
         ))}
       </div>
 
-      <MoodCard mood={mood} profit={summary.profit} />
+      <MoodCard mood={mood} />
 
       <div className="grid grid-cols-2 gap-2">
         <StatCard label="رأس المال" value={summary.capital} tone="amber" icon={Wallet} />
@@ -192,8 +195,9 @@ export function ExpensesSection({
           tone={summary.profit >= 0 ? "emerald" : "rose"}
           icon={Sparkles}
         />
-        <StatCard label="السعر الحقيقي للعلاقة" value={Math.round(realPerBundleAvg)} tone="sky" icon={Layers} />
+        <StatCard label="إجمالي المصاريف" value={summary.expensesTotal} tone="sky" icon={Receipt} />
       </div>
+
 
       <Button className="w-full gap-2 rounded-2xl" variant="outline" onClick={exportPdf} disabled={exporting}>
         {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
@@ -212,7 +216,7 @@ export function ExpensesSection({
           <Row
             key={c.purchase.id}
             title={c.purchase.kind}
-            subtitle={`${c.purchase.bundles} علاقة · السعر الحقيقي ${formatAmount(Math.round(c.realPerBundle))}${c.purchase.note ? " · " + c.purchase.note : ""}`}
+            subtitle={`${c.purchase.bundles} علاقة${c.purchase.note ? " · " + c.purchase.note : ""}`}
             amount={c.purchase.amount}
             onEdit={isToday ? () => setPurchaseDialog(c.purchase) : undefined}
             onDelete={
@@ -502,50 +506,45 @@ function SummaryLine({
 
 /* ---------------- بطاقة النتيجة التحفيزية ---------------- */
 
-const MOOD_TONE: Record<
-  Mood["tone"],
-  { card: string; badge: string; icon: React.ComponentType<{ className?: string }> }
-> = {
+const MOOD_TONE: Record<Mood["tone"], { card: string; badge: string }> = {
+  fire: {
+    card: "bg-emerald-50 border-emerald-300 text-emerald-900",
+    badge: "bg-emerald-600/10",
+  },
   great: {
     card: "bg-emerald-50 border-emerald-200 text-emerald-800",
-    badge: "bg-emerald-600 text-white",
-    icon: PartyPopper,
+    badge: "bg-emerald-600/10",
   },
   good: {
     card: "bg-sky-50 border-sky-200 text-sky-800",
-    badge: "bg-sky-600 text-white",
-    icon: TrendingUp,
+    badge: "bg-sky-600/10",
   },
   flat: {
     card: "bg-slate-50 border-slate-200 text-slate-700",
-    badge: "bg-slate-500 text-white",
-    icon: Minus,
+    badge: "bg-slate-500/10",
   },
   loss: {
     card: "bg-rose-50 border-rose-200 text-rose-800",
-    badge: "bg-rose-600 text-white",
-    icon: TrendingDown,
+    badge: "bg-rose-600/10",
   },
 };
 
-function MoodCard({ mood, profit }: { mood: Mood; profit: number }) {
+/** بطاقة تحفيزية فقط — لا تُعرض أي نسبة ربح */
+function MoodCard({ mood }: { mood: Mood }) {
   const t = MOOD_TONE[mood.tone];
   return (
     <div className={cn("flex items-center gap-3 rounded-2xl border p-4", t.card)}>
-      <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-full", t.badge)}>
-        <t.icon className="h-5 w-5" />
+      <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-2xl", t.badge)}>
+        {mood.emoji}
       </div>
       <div className="min-w-0 flex-1">
         <p className="font-bold">{mood.title}</p>
         <p className="text-xs opacity-90">{mood.text}</p>
       </div>
-      <span className="shrink-0 text-lg font-extrabold tabular-nums">
-        {profit >= 0 ? "+" : "-"}
-        {formatAmount(Math.abs(profit))}
-      </span>
     </div>
   );
 }
+
 
 /* ---------------- حقل بأيقونة ---------------- */
 

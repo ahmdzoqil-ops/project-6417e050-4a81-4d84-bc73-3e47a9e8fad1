@@ -90,24 +90,30 @@ export function groupDailyDebts(items: Transaction[]): DebtGroup[] {
 }
 
 
+/** عمليات اليوم الظاهرة في الأقسام اليومية (تستبعد عمليات المديونية) */
+export function dailyItems(items: Transaction[]) {
+  return items.filter((t) => !t.ledgerOnly && isToday(t.date));
+}
+
 export function pocketTotal(items: Transaction[]) {
-  return items
-    .filter((t) => t.type === "pocket" && isToday(t.date))
+  return dailyItems(items)
+    .filter((t) => t.type === "pocket")
     .reduce((s, t) => s + t.amount, 0);
 }
 
 export function paymentTotalToday(items: Transaction[]) {
-  return items
-    .filter((t) => t.type === "payment" && isToday(t.date))
+  return dailyItems(items)
+    .filter((t) => t.type === "payment")
     .reduce((s, t) => s + t.amount, 0);
 }
 
 /** إجمالي السحب النقدي لليوم */
 export function withdrawTotalToday(items: Transaction[]) {
-  return items
-    .filter((t) => t.type === "withdraw" && isToday(t.date))
+  return dailyItems(items)
+    .filter((t) => t.type === "withdraw")
     .reduce((s, t) => s + t.amount, 0);
 }
+
 
 
 export type DebtorRow = {

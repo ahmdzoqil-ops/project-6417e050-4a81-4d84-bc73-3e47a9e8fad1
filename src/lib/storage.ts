@@ -136,10 +136,15 @@ export function pruneOld(list: Transaction[]): Transaction[] {
   });
 }
 
-/** المعاملات التي تدخل السجل التاريخي (الجيب حركة يومية فقط) */
+/**
+ * المعاملات التي تدخل السجل التاريخي واليومي.
+ * الجيب حركة يومية فقط، وعمليات المديونية (ledgerOnly) خاصة بكشف العميل ولا
+ * تدخل السجل ولا التقارير اليومية.
+ */
 export function historyItems(list: Transaction[]): Transaction[] {
-  return list.filter((t) => t.type !== "pocket");
+  return list.filter((t) => t.type !== "pocket" && !t.ledgerOnly);
 }
+
 
 export function customerBalance(list: Transaction[], customerId: string) {
   let bal = 0;

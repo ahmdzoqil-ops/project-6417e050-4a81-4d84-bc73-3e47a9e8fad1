@@ -133,7 +133,7 @@ export function AppMenu({
       </SheetTrigger>
       <SheetContent side="right" dir="rtl" className="w-[92vw] overflow-y-auto p-0 sm:max-w-md">
         {view === "menu" ? (
-          <MenuHeader profile={profile} />
+          <MenuHeader profile={profile} onOpenProfile={() => pushView("profile")} />
         ) : (
           <SheetHeader className="border-b px-4 py-3">
             <SheetTitle className="text-right">{titles[view]}</SheetTitle>
@@ -153,7 +153,7 @@ export function AppMenu({
               <MenuItem icon={Boxes} label="الضمار والمصاريف" onClick={() => pushView("expenses")} />
               <MenuItem icon={Settings} label="الإعدادات" onClick={() => pushView("settings")} />
               <MenuItem icon={DatabaseBackup} label="النسخ الاحتياطي" onClick={() => pushView("backup")} />
-              <MenuItem icon={User} label="معلومات المستخدم" onClick={() => pushView("profile")} />
+              
               <MenuItem icon={Info} label="حول التطبيق" onClick={() => pushView("about")} />
               <MenuItem icon={Code2} label="مطور التطبيق" onClick={() => pushView("developer")} />
             </ul>
@@ -214,10 +214,16 @@ export function AppMenu({
   );
 }
 
-function MenuHeader({ profile }: { profile: Profile }) {
+function MenuHeader({
+  profile,
+  onOpenProfile,
+}: {
+  profile: Profile;
+  onOpenProfile: () => void;
+}) {
   const initials = (profile.userName ?? "").trim().slice(0, 1) || "؟";
   return (
-    <div className="relative overflow-hidden bg-gradient-to-b from-primary/20 via-primary/10 to-transparent px-4 pb-6 pt-8">
+    <div className="relative overflow-hidden bg-gradient-to-b from-primary/25 via-primary/10 to-transparent px-4 pb-5 pt-8">
       <div className="pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full bg-primary/20 blur-2xl" />
       <div className="pointer-events-none absolute -right-6 top-6 h-24 w-24 rounded-full bg-primary/10 blur-xl" />
       <div className="relative flex flex-col items-center gap-3 text-center">
@@ -234,10 +240,18 @@ function MenuHeader({ profile }: { profile: Profile }) {
             <p className="mt-0.5 text-sm text-muted-foreground">{profile.shopName}</p>
           )}
         </div>
+        <Button
+          size="sm"
+          onClick={onOpenProfile}
+          className="mt-1 gap-2 rounded-full px-5 shadow-md"
+        >
+          <User className="h-4 w-4" /> معلومات المستخدم
+        </Button>
       </div>
     </div>
   );
 }
+
 
 function MenuItem({
   icon: Icon,

@@ -44,6 +44,8 @@ import {
   MessageCircle,
   Contact,
   ImageOff,
+  Eraser,
+
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatAmount, formatDate } from "@/lib/format";
@@ -335,8 +337,8 @@ function CustomerPage({
   const [eAmount, setEAmount] = useState("");
   const [eNote, setENote] = useState("");
   const [confirmOne, setConfirmOne] = useState<Transaction | null>(null);
-  const [confirmAll, setConfirmAll] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+
+
   const [editingInfo, setEditingInfo] = useState(false);
 
   const [reportLoading, setReportLoading] = useState(false);
@@ -351,10 +353,22 @@ function CustomerPage({
   const balance = customerBalance(items, customer.id);
   const openCount = rows.filter((t) => t.type === "debt").length;
 
+  /** تصفير الرصيد دون حذف أي عملية: تُضاف تسوية بقيمة الرصيد */
   const wipeAll = () => {
-    for (const t of rows) onDeleteTx(t.id);
-    toast.success("تم تصفير حساب العميل");
-    onBack();
+    const bal = customerBalance(items, customer.id);
+    if (Math.abs(bal) < 0.009) {
+      toast.info("رصيد العميل صفر بالفعل");
+      return;
+    }
+    onAddTx({
+      type: bal > 0 ? "payment" : "debt",
+      name: customer.name,
+      amount: Math.abs(bal),
+      note: "تسوية وتصفير الحساب",
+      customerId: customer.id,
+      ledgerOnly: true,
+    });
+    toast.success("تم تصفير رصيد العميل");
   };
 
   const removeCustomer = () => {
@@ -365,7 +379,7 @@ function CustomerPage({
       // لا يوجد رابط مباشر لحذف العميل من الحالة الأعلى — نحذفه من التخزين مباشرة
       saveCustomers(loadCustomers().filter((c) => c.id !== customer.id));
     }
-    toast.success("تم حذف العميل وجميع عملياته");
+    toast.success("تم حذف العميل وجميع بياناته");
     onBack();
   };
 
@@ -373,15 +387,19 @@ function CustomerPage({
     return (
       <CustomerInfoEditor
         customer={customer}
+        txCount={rows.length}
         onBack={() => setEditingInfo(false)}
         onSave={(patch) => {
           onUpdateCustomer(customer.id, patch);
           toast.success("تم حفظ بيانات العميل");
           setEditingInfo(false);
         }}
+        onWipe={wipeAll}
+        onDelete={removeCustomer}
       />
     );
   }
+
 
   return (
     <div className="space-y-3">
@@ -555,32 +573,8 @@ function CustomerPage({
 
       <NotifySettingsCard customer={customer} onUpdateCustomer={onUpdateCustomer} />
 
-      {/* منطقة الخطر */}
-      <Card className="rounded-2xl border-destructive/40">
-        <CardContent className="space-y-3 py-4">
-          <div className="flex items-center gap-2 text-destructive">
-            <ShieldAlert className="h-4 w-4" />
-            <h3 className="text-sm font-semibold">منطقة الخطر</h3>
-          </div>
-          <Separator />
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <Button
-              variant="outline"
-              className="gap-1 text-destructive"
-              onClick={() => setConfirmAll(true)}
-            >
-              <Trash2 className="h-4 w-4" /> تصفير الحساب
-            </Button>
-            <Button
-              variant="outline"
-              className="gap-1 text-destructive"
-              onClick={() => setConfirmDelete(true)}
-            >
-              <Trash2 className="h-4 w-4" /> حذف العميل
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* تصفير الحساب وحذف العميل صارا داخل شاشة معلومات العميل */}
+
 
       {/* إضافة دين/سداد */}
       <Dialog open={!!form} onOpenChange={(o) => !o && setForm(null)}>
@@ -728,82 +722,39 @@ function CustomerPage({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={confirmAll} onOpenChange={setConfirmAll}>
-        <AlertDialogContent dir="rtl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>تصفير حساب العميل</AlertDialogTitle>
-            <AlertDialogDescription>
-              سيتم حذف {rows.length} عملية نهائيًا من كشف حساب هذا العميل.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 sm:gap-2">
-            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={async () => {
-                setConfirmAll(false);
-                if (!(await confirmSensitive("تصفير حساب العميل"))) {
-                  toast.error("تم إلغاء العملية");
-                  return;
-                }
-                wipeAll();
-              }}
-            >
-              متابعة
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-        <AlertDialogContent dir="rtl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>حذف العميل</AlertDialogTitle>
-            <AlertDialogDescription>
-              سيتم حذف بيانات العميل وجميع عملياته ({rows.length}) نهائيًا.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 sm:gap-2">
-            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={async () => {
-                setConfirmDelete(false);
-                if (!(await confirmSensitive("حذف العميل"))) {
-                  toast.error("تم إلغاء العملية");
-                  return;
-                }
-                removeCustomer();
-              }}
-            >
-              متابعة
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
     </div>
   );
 }
 
 function CustomerInfoEditor({
   customer,
+  txCount,
   onBack,
   onSave,
+  onWipe,
+  onDelete,
 }: {
   customer: Customer;
+  txCount: number;
   onBack: () => void;
   onSave: (patch: Partial<Customer>) => void;
+  onWipe: () => void;
+  onDelete: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(customer.name);
   const [phone, setPhone] = useState(customer.phone ?? "");
   const [note, setNote] = useState(customer.note ?? "");
   const [photo, setPhoto] = useState<string | undefined>(customer.photo);
+  const [confirmAll, setConfirmAll] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const pickPhoto = (file: File) => {
     const r = new FileReader();
     r.onload = () => setPhoto(String(r.result));
     r.readAsDataURL(file);
   };
+
 
   return (
     <div className="space-y-3">
@@ -923,9 +874,94 @@ function CustomerInfoEditor({
           </Button>
         </CardContent>
       </Card>
+
+      {/* منطقة الخطر */}
+      <Card className="rounded-2xl border-destructive/40">
+        <CardContent className="space-y-3 py-4">
+          <div className="flex items-center gap-2 text-destructive">
+            <ShieldAlert className="h-4 w-4" />
+            <h3 className="text-sm font-semibold">منطقة الخطر</h3>
+          </div>
+          <Separator />
+          <Button
+            variant="outline"
+            className="w-full gap-1 text-destructive"
+            onClick={() => setConfirmAll(true)}
+          >
+            <Eraser className="h-4 w-4" /> تصفير الحساب
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full gap-1 text-destructive"
+            onClick={() => setConfirmDelete(true)}
+          >
+            <Trash2 className="h-4 w-4" /> حذف العميل نهائيًا
+          </Button>
+          <p className="text-[11px] text-muted-foreground">
+            التصفير يجعل الرصيد صفرًا مع الاحتفاظ بجميع العمليات. الحذف يزيل
+            العميل واسمه ورقمه وكل عملياته نهائيًا.
+          </p>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={confirmAll} onOpenChange={setConfirmAll}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>تصفير حساب العميل</AlertDialogTitle>
+            <AlertDialogDescription>
+              سيصبح رصيد «{customer.name}» صفرًا مع الاحتفاظ بجميع العمليات
+              ({txCount}) في كشف الحساب.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                setConfirmAll(false);
+                if (!(await confirmSensitive("تصفير حساب العميل"))) {
+                  toast.error("تم إلغاء العملية");
+                  return;
+                }
+                onWipe();
+                onBack();
+              }}
+            >
+              متابعة
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف العميل</AlertDialogTitle>
+            <AlertDialogDescription>
+              سيتم حذف بيانات «{customer.name}» ورقمه وجميع عملياته ({txCount})
+              نهائيًا ولا يمكن التراجع.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                setConfirmDelete(false);
+                if (!(await confirmSensitive("حذف العميل"))) {
+                  toast.error("تم إلغاء العملية");
+                  return;
+                }
+                onDelete();
+              }}
+            >
+              متابعة
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+
 
 function NotifySettingsCard({
   customer,

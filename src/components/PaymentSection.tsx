@@ -43,8 +43,9 @@ export function PaymentSection({
   }, [editing]);
 
   const todayPayments = items
-    .filter((t) => t.type === "payment" && isToday(t.date))
+    .filter((t) => t.type === "payment" && !t.ledgerOnly && isToday(t.date))
     .sort((a, z) => z.date.localeCompare(a.date));
+
   const total = todayPayments.reduce((s, t) => s + t.amount, 0);
 
   return (
