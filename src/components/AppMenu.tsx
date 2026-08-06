@@ -133,7 +133,7 @@ export function AppMenu({
       </SheetTrigger>
       <SheetContent side="right" dir="rtl" className="w-[92vw] overflow-y-auto p-0 sm:max-w-md">
         {view === "menu" ? (
-          <MenuHeader profile={profile} />
+          <MenuHeader profile={profile} onOpenProfile={() => pushView("profile")} />
         ) : (
           <SheetHeader className="border-b px-4 py-3">
             <SheetTitle className="text-right">{titles[view]}</SheetTitle>
@@ -153,7 +153,7 @@ export function AppMenu({
               <MenuItem icon={Boxes} label="الضمار والمصاريف" onClick={() => pushView("expenses")} />
               <MenuItem icon={Settings} label="الإعدادات" onClick={() => pushView("settings")} />
               <MenuItem icon={DatabaseBackup} label="النسخ الاحتياطي" onClick={() => pushView("backup")} />
-              <MenuItem icon={User} label="معلومات المستخدم" onClick={() => pushView("profile")} />
+              
               <MenuItem icon={Info} label="حول التطبيق" onClick={() => pushView("about")} />
               <MenuItem icon={Code2} label="مطور التطبيق" onClick={() => pushView("developer")} />
             </ul>
