@@ -199,42 +199,58 @@ export function dayLabel(key: string, todayKey = recentDayKeys(1)[0]) {
 /* ---------------- رسائل تحفيزية ---------------- */
 
 export type Mood = {
-  tone: "great" | "good" | "flat" | "loss";
+  tone: "fire" | "great" | "good" | "flat" | "loss";
+  emoji: string;
   title: string;
   text: string;
 };
 
-/** رسالة تحفيزية حسب نسبة الربح إلى رأس المال */
+/**
+ * رسالة تحفيزية فقط — تُحسب النسبة داخليًا ولا تُعرض إطلاقًا.
+ */
 export function profitMood(profit: number, capital: number): Mood {
   if (capital <= 0 && profit === 0) {
     return {
       tone: "flat",
+      emoji: "🙂",
       title: "لا توجد بيانات بعد",
-      text: "أضف الشروة والمصاريف لتظهر لك النتيجة اليومية.",
+      text: "أضف الشروة والمصاريف لتظهر لك نتيجة اليوم.",
     };
   }
   const ratio = capital > 0 ? profit / capital : profit > 0 ? 1 : -1;
   if (ratio >= 0.25)
     return {
+      tone: "fire",
+      emoji: "😍🔥",
+      title: "السوق اليوم حريقة",
+      text: "يوم مميز — استمر على نفس الأسلوب.",
+    };
+  if (ratio >= 0.1)
+    return {
       tone: "great",
-      title: "يوم ممتاز! 🎉",
-      text: "ربح قوي اليوم — استمر على نفس الأسلوب.",
+      emoji: "😇",
+      title: "ابتسم… السوق اليوم في صالحك",
+      text: "النتيجة مريحة، واصل.",
     };
   if (ratio > 0)
     return {
       tone: "good",
-      title: "ربح جيد 👍",
-      text: "النتيجة إيجابية، راجع المصاريف لزيادة الربح.",
+      emoji: "🙂",
+      title: "السوق اليوم لا بأس",
+      text: "يوم عادي — راجع المصاريف لزيادة الحصيلة.",
     };
   if (ratio === 0)
     return {
       tone: "flat",
-      title: "تعادل",
-      text: "لا ربح ولا خسارة — حاول تقليل المصاريف غدًا.",
+      emoji: "🙃",
+      title: "السوق اليوم بُورة",
+      text: "لا ربح ولا خسارة — بكرة أفضل بإذن الله.",
     };
   return {
     tone: "loss",
-    title: "خسارة اليوم",
-    text: "راجع سعر الشروة والمصاريف، وركّز على تحصيل الديون.",
+    emoji: "😭",
+    title: "ما هذا… بُورة طاحنة",
+    text: "راجع سعر الشروة وركّز على تحصيل الديون.",
   };
 }
+
