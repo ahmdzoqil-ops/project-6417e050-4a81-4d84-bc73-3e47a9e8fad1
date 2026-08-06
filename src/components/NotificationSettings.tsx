@@ -24,6 +24,13 @@ function DaysControl({
   onChange: (v: number) => void;
   disabled?: boolean;
 }) {
+  // حقل نصي حر: يسمح بمسح الرقم وكتابة رقم جديد بسهولة
+  const [text, setText] = useState(String(value));
+
+  useEffect(() => {
+    setText((prev) => (Number(prev) === value ? prev : String(value)));
+  }, [value]);
+
   return (
     <div className={disabled ? "space-y-2 opacity-50" : "space-y-2"}>
       <div className="flex flex-wrap gap-2">
@@ -48,17 +55,32 @@ function DaysControl({
           عدد أيام مخصص
         </Label>
         <Input
-          type="number"
-          min={1}
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          placeholder="مثلاً 10"
           disabled={disabled}
-          value={value}
-          onChange={(e) => onChange(Math.max(1, Number(e.target.value) || 1))}
-          className="h-8 w-24"
+          value={text}
+          onFocus={(e) => e.currentTarget.select()}
+          onChange={(e) => {
+            const raw = e.target.value.replace(/[^\d]/g, "");
+            setText(raw);
+            const n = Number(raw);
+            if (raw && Number.isFinite(n) && n > 0) onChange(n);
+          }}
+          onBlur={() => {
+            const n = Number(text);
+            if (!text || !Number.isFinite(n) || n <= 0) {
+              setText(String(value));
+            }
+          }}
+          className="h-9 w-24 text-center"
         />
       </div>
     </div>
   );
 }
+
 
 export function NotificationSettings({
   items,
