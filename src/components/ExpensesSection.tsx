@@ -181,7 +181,7 @@ export function ExpensesSection({
         ))}
       </div>
 
-      <MoodCard mood={mood} profit={summary.profit} />
+      <MoodCard mood={mood} />
 
       <div className="grid grid-cols-2 gap-2">
         <StatCard label="رأس المال" value={summary.capital} tone="amber" icon={Wallet} />
@@ -192,8 +192,9 @@ export function ExpensesSection({
           tone={summary.profit >= 0 ? "emerald" : "rose"}
           icon={Sparkles}
         />
-        <StatCard label="السعر الحقيقي للعلاقة" value={Math.round(realPerBundleAvg)} tone="sky" icon={Layers} />
+        <StatCard label="إجمالي المصاريف" value={summary.expensesTotal} tone="sky" icon={Receipt} />
       </div>
+
 
       <Button className="w-full gap-2 rounded-2xl" variant="outline" onClick={exportPdf} disabled={exporting}>
         {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
