@@ -46,7 +46,7 @@ import { toast } from "sonner";
 import { formatAmount } from "@/lib/format";
 import { dayKey, startOfDay, type Profile, type Transaction } from "@/lib/storage";
 import { dailyDebtTotal, pocketTotal } from "@/lib/derive";
-import { reportShell, shareHtmlReport } from "@/lib/pdf";
+import { dataTable, reportShell, sectionTitle, shareHtmlReport, summaryCards } from "@/lib/pdf";
 import {
   dayLabel,
   daySummary,
