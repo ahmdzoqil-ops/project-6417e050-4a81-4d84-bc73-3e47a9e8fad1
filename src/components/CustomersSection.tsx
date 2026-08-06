@@ -571,32 +571,8 @@ function CustomerPage({
 
       <NotifySettingsCard customer={customer} onUpdateCustomer={onUpdateCustomer} />
 
-      {/* منطقة الخطر */}
-      <Card className="rounded-2xl border-destructive/40">
-        <CardContent className="space-y-3 py-4">
-          <div className="flex items-center gap-2 text-destructive">
-            <ShieldAlert className="h-4 w-4" />
-            <h3 className="text-sm font-semibold">منطقة الخطر</h3>
-          </div>
-          <Separator />
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <Button
-              variant="outline"
-              className="gap-1 text-destructive"
-              onClick={() => setConfirmAll(true)}
-            >
-              <Trash2 className="h-4 w-4" /> تصفير الحساب
-            </Button>
-            <Button
-              variant="outline"
-              className="gap-1 text-destructive"
-              onClick={() => setConfirmDelete(true)}
-            >
-              <Trash2 className="h-4 w-4" /> حذف العميل
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* تصفير الحساب وحذف العميل صارا داخل شاشة معلومات العميل */}
+
 
       {/* إضافة دين/سداد */}
       <Dialog open={!!form} onOpenChange={(o) => !o && setForm(null)}>
