@@ -872,9 +872,94 @@ function CustomerInfoEditor({
           </Button>
         </CardContent>
       </Card>
+
+      {/* منطقة الخطر */}
+      <Card className="rounded-2xl border-destructive/40">
+        <CardContent className="space-y-3 py-4">
+          <div className="flex items-center gap-2 text-destructive">
+            <ShieldAlert className="h-4 w-4" />
+            <h3 className="text-sm font-semibold">منطقة الخطر</h3>
+          </div>
+          <Separator />
+          <Button
+            variant="outline"
+            className="w-full gap-1 text-destructive"
+            onClick={() => setConfirmAll(true)}
+          >
+            <Eraser className="h-4 w-4" /> تصفير الحساب
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full gap-1 text-destructive"
+            onClick={() => setConfirmDelete(true)}
+          >
+            <Trash2 className="h-4 w-4" /> حذف العميل نهائيًا
+          </Button>
+          <p className="text-[11px] text-muted-foreground">
+            التصفير يجعل الرصيد صفرًا مع الاحتفاظ بجميع العمليات. الحذف يزيل
+            العميل واسمه ورقمه وكل عملياته نهائيًا.
+          </p>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={confirmAll} onOpenChange={setConfirmAll}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>تصفير حساب العميل</AlertDialogTitle>
+            <AlertDialogDescription>
+              سيصبح رصيد «{customer.name}» صفرًا مع الاحتفاظ بجميع العمليات
+              ({txCount}) في كشف الحساب.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                setConfirmAll(false);
+                if (!(await confirmSensitive("تصفير حساب العميل"))) {
+                  toast.error("تم إلغاء العملية");
+                  return;
+                }
+                onWipe();
+                onBack();
+              }}
+            >
+              متابعة
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف العميل</AlertDialogTitle>
+            <AlertDialogDescription>
+              سيتم حذف بيانات «{customer.name}» ورقمه وجميع عملياته ({txCount})
+              نهائيًا ولا يمكن التراجع.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                setConfirmDelete(false);
+                if (!(await confirmSensitive("حذف العميل"))) {
+                  toast.error("تم إلغاء العملية");
+                  return;
+                }
+                onDelete();
+              }}
+            >
+              متابعة
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+
 
 function NotifySettingsCard({
   customer,
