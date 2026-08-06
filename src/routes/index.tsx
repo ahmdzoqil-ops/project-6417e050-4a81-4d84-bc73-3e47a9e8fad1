@@ -352,10 +352,11 @@ function HomeTab({
   const todays = useMemo(
     () =>
       items
-        .filter((t) => isToday(t.date))
+        .filter((t) => isToday(t.date) && !t.ledgerOnly)
         .sort((a, z) => z.date.localeCompare(a.date)),
     [items],
   );
+
 
   const filteredToday = useMemo(
     () => todays.filter((t) => matchesQuery(t.name, query)),
